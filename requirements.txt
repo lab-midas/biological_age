@@ -1,0 +1,15 @@
+# jupyter
+# pip install -e ./
+torch
+torchvision
+hydra-core
+pandas
+pyarrow
+python-dotenv
+h5py
+matplotlib
+pytorch-lightning
+wandb
+scikit-image
+batchgenerators
+nilearn
