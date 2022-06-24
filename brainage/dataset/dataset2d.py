@@ -2,7 +2,9 @@ import os
 from sys import getsizeof
 from pathlib import Path
 
-import torch
+import logging
+import collections
+#import torch
 import time
 import h5py
 import dotenv
@@ -12,6 +14,7 @@ import scipy.ndimage
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset as AbstractDataset
 dotenv.load_dotenv()
+from tqdm import tqdm
 
 class SliceDataset(AbstractDataset):
 
@@ -81,4 +84,77 @@ class SliceDataset(AbstractDataset):
         sample['data'] = np.squeeze(sample['data'], axis=0)
 
         return sample
-    
+
+
+class FundusDataset(AbstractDataset):
+    def __init__(self,
+                 data,
+                 keys,
+                 info,
+                 group,
+                 column='label',
+                 preload=False,
+                 ukb=True,
+                 transform=None):
+
+        super().__init__()
+
+        # copy over
+        self.transform = transform
+        self.logger = logging.getLogger(__name__)
+        self.preload = preload
+
+        self.logger.info('opening dataset ...')
+        # if ukb:
+        #    info_df = pd.read_csv(info, index_col=0, usecols=[1,2,3,4,5], dtype={'key': 'string', column: np.float32})
+        # else:
+        info_df = pd.read_csv(info, index_col=0, dtype={'key': 'string', column: np.float32})
+        self.keys = [l.strip() for l in Path(keys).open().readlines()] if isinstance(keys, str) else keys
+
+        fhandle = h5py.File(data, 'r')
+
+        def load_data():
+            for key in tqdm(self.keys):
+                group_str, key = key.split('/')
+                group_str += '/'
+                label = info_df.loc[key][column]
+
+                #coin = np.random.randint(2, size=1)
+                #if coin:
+                #    group_str = 'left/'
+                #else:
+                #    group_str = 'right/'
+
+                for idx in range(4):
+                    keyh5 = key + '_' + str(idx)
+                    if f'{group_str}{keyh5}' in fhandle:
+                        break
+                    else:
+                        keyh5 = ''
+
+                if self.preload:
+                    data = fhandle[f'{group_str}{keyh5}'][:]  # x, y, RGB
+                else:
+                    data = fhandle[f'{group_str}{keyh5}']
+
+                sample = {'data': data,
+                          'label': label,
+                          'key': key}
+                yield sample
+
+        self.data_container = collections.deque(load_data())
+
+    def __len__(self):
+        return len(self.data_container)
+
+    def __getitem__(self, i):
+        ds = self.data_container[i]
+        sample = {'data': np.transpose(ds['data'][:][np.newaxis, ...].astype(np.float32), (0, -1, 1, 2)),
+                  'label': ds['label'],
+                  'key': ds['key']}
+        # data augmentation
+        # data tensor format B x C X H X W (B=1, C=3)
+        if self.transform:
+            sample = self.transform(**sample)
+        sample['data'] = np.squeeze(sample['data'], axis=0)
+        return sample

@@ -20,6 +20,7 @@ class BrainDataset(AbstractDataset):
                  group,
                  column='label',
                  preload=False,
+                 ukb=True,
                  transform=None):
 
         super().__init__()
@@ -30,18 +31,112 @@ class BrainDataset(AbstractDataset):
         self.preload = preload
 
         self.logger.info('opening dataset ...')
+        self.logger.info(info)
+        #if ukb:
+        #    info_df = pd.read_csv(info, index_col=0, usecols=[1,2,3,4,5], dtype={'key': 'string', column: np.float32})
+        #else:
         info_df = pd.read_csv(info, index_col=0, dtype={'key': 'string', column: np.float32})
         self.keys = [l.strip() for l in Path(keys).open().readlines()] if isinstance(keys, str) else keys
-        
+
+        self.logger.info('loading h5 dataset ...')
+        self.logger.info(data)
         fhandle = h5py.File(data, 'r')
         def load_data():
             for key in tqdm(self.keys):
                 label = info_df.loc[key][column]
                 group_str = group + '/' if group else ''
-                if self.preload:
-                    data = fhandle[f'{group_str}{key}'][:]
-                else:
-                    data = fhandle[f'{group_str}{key}']
+                try:
+                    if ukb:
+                        keyh5 = key + '_2'
+                    else:
+                        keyh5 = key
+                    if self.preload:
+                        data = fhandle[f'{group_str}{keyh5}'][:]
+                    else:
+                        data = fhandle[f'{group_str}{keyh5}']
+                except:
+                    if ukb:
+                        keyh5 = key + '_3'
+                    else:
+                        keyh5 = key
+                    if self.preload:
+                        data = fhandle[f'{group_str}{keyh5}'][:]
+                    else:
+                        data = fhandle[f'{group_str}{keyh5}']
+                sample = {'data': data,
+                          'label': label,
+                          'key': key}
+                yield sample
+        self.data_container = collections.deque(load_data())
+
+    def __len__(self):
+        return len(self.data_container)
+
+    def __getitem__(self, i):
+        ds = self.data_container[i]
+        sample = {'data':   ds['data'][:][np.newaxis, np.newaxis, ...].astype(np.float32),
+                  'label':  ds['label'],
+                  'key':    ds['key']}
+        # data augmentation
+        # data tensor format B x C X H X W X D (B=C=1)
+        if self.transform:
+            sample = self.transform(**sample)
+        sample['data'] = np.squeeze(sample['data'], axis=0)
+        return sample
+
+
+class HeartDataset(AbstractDataset):
+    def __init__(self,
+                 data,
+                 keys,
+                 info,
+                 group,
+                 column='label',
+                 preload=False,
+                 ukb=True,
+                 transform=None):
+
+        super().__init__()
+
+        # copy over
+        self.transform = transform
+        self.logger = logging.getLogger(__name__)
+        self.preload = preload
+
+        self.logger.info('opening dataset ...')
+        self.logger.info(info)
+        #if ukb:
+        #    info_df = pd.read_csv(info, index_col=0, usecols=[1,2,3,4,5], dtype={'key': 'string', column: np.float32})
+        #else:
+        info_df = pd.read_csv(info, index_col=0, dtype={'key': 'string', column: np.float32})
+        self.keys = [l.strip() for l in Path(keys).open().readlines()] if isinstance(keys, str) else keys
+
+        self.logger.info('loading h5 dataset ...')
+        self.logger.info(data)
+        fhandle = h5py.File(data, 'r')
+        def load_data():
+            for key in tqdm(self.keys):
+                label = info_df.loc[key][column]
+                group_str = group + '/' if group else ''
+                try:
+                    if ukb:
+                        keyh5 = key + '_2'
+                    else:
+                        keyh5 = key
+                    if self.preload:
+                        data = fhandle[f'{group_str}{keyh5}'][:]
+                    else:
+                        data = fhandle[f'{group_str}{keyh5}']
+                except:
+                    if ukb:
+                        keyh5 = key + '_3'
+                    else:
+                        keyh5 = key
+                    if self.preload:
+                        data = fhandle[f'{group_str}{keyh5}'][:]
+                    else:
+                        data = fhandle[f'{group_str}{keyh5}']
+                data = np.squeeze(data[:, :, np.random.randint(np.shape(data)[2], size=1), :])  # take a random slice -> data: X x Y x Time
                 sample = {'data': data,
                           'label': label,
                           'key': key}

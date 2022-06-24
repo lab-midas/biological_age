@@ -12,7 +12,8 @@ from omegaconf import OmegaConf
 from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.loggers import NeptuneLogger
-from dotenv import load_dotenv
+#from dotenv import load_dotenv
+import wandb
 
 from batchgenerators.transforms.color_transforms import GammaTransform
 from batchgenerators.transforms.spatial_transforms import MirrorTransform
@@ -20,12 +21,16 @@ from batchgenerators.transforms.crop_and_pad_transforms import CenterCropTransfo
 from batchgenerators.transforms.abstract_transforms import Compose
 
 from brainage.model.model3d import AgeModel3DVolume
-from brainage.dataset.dataset3d import BrainDataset, BrainPatchDataset
+from brainage.model.model2d import AgeModel2DChannels
+from brainage.dataset.dataset3d import BrainDataset, BrainPatchDataset, HeartDataset
+from brainage.dataset.dataset2d import FundusDataset
+from brainage.utils import fix_dict_in_wandb_config
 
-load_dotenv()
+#load_dotenv()
 
 config = os.getenv('CONFIG')
-@hydra.main(config_path=config, strict=False)
+
+@hydra.main(config_path=os.path.dirname(config), config_name=os.path.splitext(os.path.basename(config))[0])
 def main(cfg):
     # config
     project = cfg.project.name
@@ -40,20 +45,40 @@ def main(cfg):
     if debug_set:
         train_set = debug_set
         val_set = debug_set
+        offline_wandb = True
+        log_model = False
+    else:
+        offline_wandb = False
+        log_model = True
     patch_size = cfg.dataset.patch_size
     data_mode = cfg.dataset.mode 
     data_augmentation = cfg.dataset.data_augmentation
     crop_size = np.array(cfg.dataset.crop_size)
     crop_margins = np.array(cfg.dataset.crop_margins)
-    gamma_range = cfg.dataset.gamma_range 
+    gamma_range = cfg.dataset.gamma_range
+    mirror_axis = cfg.dataset.mirror_axis
     preload = cfg.dataset.preload
     seed = cfg.project.seed or 42
     seed_everything(seed)
     ts = time.gmtime()
-    job_id = time.strftime("%Y-%m-%d-%H-%M-%S", ts) + f'-{cfg.dataset.fold}'
+    job_id = 'fold' + f'-{cfg.dataset.fold}-' + time.strftime("%Y-%m-%d-%H-%M-%S", ts)
+    if 'brain' in job:
+        dataset = 'brain'
+    elif 'heart' in job:
+        dataset = 'heart'
+    elif 'kidney' in job:
+        dataset = 'abdominal'
+    elif 'liver' in job:
+        dataset = 'abdominal'
+    elif 'spleen' in job:
+        dataset = 'abdominal'
+    elif 'fundus' in job:
+        dataset = 'fundus'
 
     # logging
-    wandb_logger = WandbLogger(name=f'{job}-{job_id}', project=project, log_model=True)
+    if not offline_wandb:
+        wandb.init(name=f'{job}-{job_id}', entity='lab-midas', project=project, config=OmegaConf.to_container(cfg))
+    wandb_logger = WandbLogger(name=f'{job}-{job_id}', entity='lab-midas', project=project, offline=offline_wandb, log_model=log_model)
     #neptune_logger = NeptuneLogger(project_name=f'lab-midas/{project}',
     #                               params=OmegaConf.to_container(cfg, resolve=True),
     #                               experiment_name=f'{job}-{job_id}',
@@ -101,29 +126,68 @@ def main(cfg):
         if np.any(crop_size):
             transforms.append(RandomCropTransform(crop_size=crop_size, data_key='data', margins=crop_margins))
         transforms.append(GammaTransform(gamma_range=gamma_range, data_key='data'))
-        transforms.append(MirrorTransform(axes=[0], data_key='data'))
+        if np.any(mirror_axis):
+            transforms.append(MirrorTransform(axes=[mirror_axis], data_key='data'))
         train_transform = Compose(transforms)
         if not data_augmentation:
             train_transform = val_transform
 
-        ds_train = BrainDataset(data=data_path,
-                            keys=train_keys,
-                            info=info,
-                            group=data_group,
-                            column=infocolumn,
-                            preload=preload,
-                            transform=train_transform)
+        if dataset == 'brain':
+            ds_train = BrainDataset(data=data_path,
+                                keys=train_keys,
+                                info=info,
+                                group=data_group,
+                                column=infocolumn,
+                                preload=preload,
+                                transform=train_transform)
 
-        ds_val = BrainDataset(data=data_path,
-                            keys=val_keys, 
-                            info=info,
-                            column=infocolumn,
-                            group=data_group,
-                            preload=preload,
-                            transform=val_transform)
+            ds_val = BrainDataset(data=data_path,
+                                keys=val_keys,
+                                info=info,
+                                column=infocolumn,
+                                group=data_group,
+                                preload=preload,
+                                transform=val_transform)
+        elif dataset == 'heart':
+            ds_train = HeartDataset(data=data_path,
+                                    keys=train_keys,
+                                    info=info,
+                                    group=data_group,
+                                    column=infocolumn,
+                                    preload=preload,
+                                    transform=train_transform)
 
-    model = AgeModel3DVolume(OmegaConf.to_container(cfg, resolve=True),
-                     ds_train, ds_val)
+            ds_val = HeartDataset(data=data_path,
+                                  keys=val_keys,
+                                  info=info,
+                                  column=infocolumn,
+                                  group=data_group,
+                                  preload=preload,
+                                  transform=val_transform)
+
+        elif dataset == 'fundus':
+            ds_train = FundusDataset(data=data_path,
+                                    keys=train_keys,
+                                    info=info,
+                                    group=data_group,
+                                    column=infocolumn,
+                                    preload=preload,
+                                    transform=train_transform)
+
+            ds_val = FundusDataset(data=data_path,
+                                  keys=val_keys,
+                                  info=info,
+                                  column=infocolumn,
+                                  group=data_group,
+                                  preload=preload,
+                                  transform=val_transform)
+
+    if dataset == 'fundus':
+        model = AgeModel2DChannels(OmegaConf.to_container(cfg, resolve=True),
+                     ds_train, ds_val, offline_wandb, log_model)
+    else:
+        model = AgeModel3DVolume(OmegaConf.to_container(cfg, resolve=True),
+                     ds_train, ds_val, offline_wandb, log_model)
 
     trainer = Trainer(logger=[wandb_logger],
                       **OmegaConf.to_container(cfg.trainer))

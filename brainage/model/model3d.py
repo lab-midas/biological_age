@@ -21,14 +21,17 @@ class AgeModel3DVolume(pl.LightningModule):
     def __init__(self,
                 hparams,
                 train_ds=None,
-                val_ds=None):
+                val_ds=None,
+                offline_wandb=False,
+                log_model=True
+                ):
         super().__init__()
 
         # copy over
-        self.hparams = hparams
+        #self.hparams = hparams
         cfg = OmegaConf.create(hparams)
         self.model_depth = cfg.model.depth or 18
-        self.inputs = cfg.model.inputs or 1
+        self.inputs = cfg.model.inputs or 3
         self.outputs = cfg.model.outputs or 1
         self.use_position = cfg.model.position or False
         self.loss_type = cfg.model.loss or 'l2'
@@ -43,12 +46,14 @@ class AgeModel3DVolume(pl.LightningModule):
         self.train_ds = train_ds
         self.val_ds = val_ds
         self.no_max_pool = cfg.model.no_max_pool or False
+        self.offline_wandb = offline_wandb
+        self.log_model = log_model
 
         if self.loss_type == 'l2':
             self.loss_criterion = l2_loss(heteroscedastic=self.heteroscedastic)
 
         self.net = generate_model(model_depth=self.model_depth, 
-                                n_input_channels=self.inputs , 
+                                n_input_channels=self.inputs,
                                 n_classes=self.outputs,
                                 norm_type=self.norm_type, 
                                 use_layer=self.use_layer,
@@ -75,9 +80,11 @@ class AgeModel3DVolume(pl.LightningModule):
     def log_samples(self, batch, batch_idx):
         samples = []
         for img, label in zip(batch['data'], batch['label']):
-            img = img[0, :, img.size()[1]//2, :].cpu().numpy()*255.0
-            samples.append(wandb.Image(img, caption=f'batch {batch_idx} age {label}'))
-        wandb.log({'samples': samples})
+            #img = img[0, :, img.size()[1]//2, :].cpu().numpy()*255.0  # brain
+            imgc = img[0, :, :, :].cpu().numpy() * 255.0
+            samples.append(wandb.Image(imgc, caption=f'batch {batch_idx} age {label}'))
+        if not self.offline_wandb:
+            wandb.log({'samples': samples})
 
     def training_step(self, batch, batch_idx):
         x = batch['data'].float()
@@ -86,9 +93,10 @@ class AgeModel3DVolume(pl.LightningModule):
         y_hat = self(x, pos=pos)
         loss, y_pred = self.loss_criterion(y_hat, y)
 
-        if self.global_step < 5:
+        if self.global_step < 5 and self.log_model:
             self.log_samples(batch, batch_idx)
 
+        self.log("train/loss", loss)
         logs = {'train_loss': loss.item()}
         return {'loss': loss, 'log': logs}
 
@@ -98,9 +106,14 @@ class AgeModel3DVolume(pl.LightningModule):
         pos = batch['position'].float() if self.use_position else None
         y_hat = self(x, pos=pos)
         loss, y_pred = self.loss_criterion(y_hat, y)
+        mse = F.mse_loss(y_pred, y)
+        mae = F.l1_loss(y_pred, y)
+        self.log("validation/loss", loss)
+        self.log('mse', mse)
+        self.log('mae', mae)
         return {'val_loss': loss,
-                'mse': F.mse_loss(y_pred, y), 
-                'mae': F.l1_loss(y_pred, y)}  
+                'mse': mse,
+                'mae': mae}
 
     def validation_epoch_end(self, outputs):
         avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()

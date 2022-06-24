@@ -29,6 +29,9 @@ from walkdir import filtered_walk, file_paths
 from collections.abc import Sequence
 from collections import OrderedDict
 import csv
+import dateutil.parser
+import pandas as pd
+from biobank_utils import *
 
 
 def unzip(zip_file, output_dir):
@@ -383,7 +386,7 @@ def dcm2nii_zipped_dixon(zip_file, output_dir,
         tmp.cleanup()
         return
 
-def nii_zipped(zip_file, output_dir,
+def nii_zipped_brain(zip_file, output_dir,
                    add_id=False,
                    single_dir=False,
                    csv='',
@@ -452,31 +455,228 @@ def nii_zipped(zip_file, output_dir,
 
     try:
         # get corresponding nifti
-        shutil.move(os.path.join(tmp.name, 'T1', 'T1.nii.gz'), output_dir.joinpath('raw', subj_str + '_' + run_id + '_T1.nii.gz'))
-        shutil.move(os.path.join(tmp.name, 'T1', 'transforms', 'T1_to_MNI_linear.mat'), output_dir.joinpath('n4_flirt', subj_str + '_' + run_id + '_mni_linear.mat'))
-        shutil.move(os.path.join(tmp.name, 'T1', 'transforms', 'T1_to_MNI_warp_coef.nii.gz'), output_dir.joinpath('n4_flirt', subj_str + '_' + run_id + '_warp_coef.nii.gz'))
-        shutil.move(os.path.join(tmp.name, 'T1', 'T1fast', 'T1_brain_bias.nii.gz'), output_dir.joinpath('n4_flirt_robex_fcm', subj_str + '_' + run_id + '_bias.nii.gz'))
-        shutil.move(os.path.join(tmp.name, 'T1', 'T1fast', 'T1_brain_seg.nii.gz'), output_dir.joinpath('n4_flirt_robex_fcm', subj_str + '_' + run_id + '_seg.nii.gz'))
-        shutil.move(os.path.join(tmp.name, 'T1', 'T1_brain_mask.nii.gz'), output_dir.joinpath('n4_flirt_robex_fcm', subj_str + '_' + run_id + '_T1_brain_mask.nii.gz'))
-        shutil.move(os.path.join(tmp.name, 'T1', 'T1_brain_to_MNI.nii.gz'), output_dir.joinpath('processed', subj_str + '_' + run_id + '.nii.gz'))
+        shutil.move(os.path.join(tmp.name, 'T1', 'T1.nii.gz'), output_dir.joinpath('raw', subj_id + '_' + run_id + '_T1.nii.gz'))
+        shutil.move(os.path.join(tmp.name, 'T1', 'transforms', 'T1_to_MNI_linear.mat'), output_dir.joinpath('n4_flirt', subj_id + '_' + run_id + '_mni_linear.mat'))
+        shutil.move(os.path.join(tmp.name, 'T1', 'transforms', 'T1_to_MNI_warp_coef.nii.gz'), output_dir.joinpath('n4_flirt', subj_id + '_' + run_id + '_warp_coef.nii.gz'))
+        shutil.move(os.path.join(tmp.name, 'T1', 'T1_fast', 'T1_brain_bias.nii.gz'), output_dir.joinpath('n4_flirt_robex_fcm', subj_id + '_' + run_id + '_bias.nii.gz'))
+        shutil.move(os.path.join(tmp.name, 'T1', 'T1_fast', 'T1_brain_seg.nii.gz'), output_dir.joinpath('n4_flirt_robex_fcm', subj_id + '_' + run_id + '_seg.nii.gz'))
+        shutil.move(os.path.join(tmp.name, 'T1', 'T1_brain_mask.nii.gz'), output_dir.joinpath('n4_flirt_robex_fcm', subj_id + '_' + run_id + '_T1_brain_mask.nii.gz'))
+        shutil.move(os.path.join(tmp.name, 'T1', 'T1_brain_to_MNI.nii.gz'), output_dir.joinpath('processed', subj_id + '_' + run_id + '.nii.gz'))
 
-        if len(csv) > 0:
-            tags_in_files = get_tags_in_files(dcm_dir)
-            tags_to_exclude = {"PixelData": ["0x7fe0", "0x0010", "Pixel Data", "PixelData"]}
-            directory_to_csv(dcm_dir, os.path.join(csv, subj_str + nii_path.name), tags_in_files, tags_to_exclude)
+        #if len(csv) > 0:
+            #tags_in_files = get_tags_in_files(dcm_dir)
+            #tags_to_exclude = {"PixelData": ["0x7fe0", "0x0010", "Pixel Data", "PixelData"]}
+            #directory_to_csv(dcm_dir, os.path.join(csv, subj_str + nii_path.name), tags_in_files, tags_to_exclude)
 
     except:
         print(f'conversion error {subj_id}', file=sys.stderr)
-        shutil.rmtree(dest_dir)
+        #shutil.rmtree(dest_dir)
+
+    finally:
+        # delete tmp directory
+        tmp.cleanup()
+
+def nii_zipped_sa_heart(zip_file, output_dir,
+                   add_id=False,
+                   single_dir=False,
+                   csv='',
+                   verbose=False):
+    """Convert zipped sequences to nifti.
+
+    Converts zipped NAKO DICOM data stored in a sequence folder
+    (e.g.'/mnt/data/rawdata/NAKO_195/NAKO-195_MRT-Dateien/3D_GRE_TRA_W')
+    to .nii files in a defined output folder
+    (such as '/mnt/data/rawdata/NAKO_195_nii/NAKO-195_MRT-Dateien/3D_GRE_TRA_W')
+
+    Args:
+        zip_file (str/Path): zip file to extract
+        output_dir (str/Path): output directory for nifti files
+        add_id (bool): add subject id (parsed from zip filename) as praefix
+        single_dir (bool): save nifti files in a single directory (no subdirs)
+        verbose (bool): activate prints
+    """
+
+    f = Path(zip_file)
+    output_dir = Path(output_dir)
+
+    # create temp directory
+    tmp = tempfile.TemporaryDirectory()
+    # get subject id
+    subj_id = re.match('.*([0-9]{7}).*', f.name).group(1)
+    run_id = f.name.split('_')[2]
+
+    if output_dir.joinpath('raw', subj_id + '_' + run_id + '_sa.nii.gz').exists():
+        print(f'{subj_id} already converted', file=sys.stdout)
+        return
+
+    if verbose:
+        print('unzipping: ', f)
+
+    # unzip to temp directory
+    try:
+        unzip(f, tmp.name)
+    except:
+        print(f'zip error {subj_id}', file=sys.stderr)
+        return
+
+    if verbose:
+        print('converting ... ')
+
+    # create folder with subject id
+    #dest_dir = output_dir.joinpath(subj_id)
+    #dest_dir.mkdir(exist_ok=True)
+    output_dir.joinpath('raw').mkdir(exist_ok=True)
+    output_dir.joinpath('processed').mkdir(exist_ok=True)
+
+    dicom_dir = tmp.name
+
+    if os.path.exists(os.path.join(dicom_dir, 'manifest.cvs')):
+        os.system('cp {0} {1}'.format(os.path.join(dicom_dir, 'manifest.cvs'),
+                                      os.path.join(dicom_dir, 'manifest.csv')))
+    process_manifest(os.path.join(dicom_dir, 'manifest.csv'),
+                     os.path.join(dicom_dir, 'manifest2.csv'))
+    df2 = pd.read_csv(os.path.join(dicom_dir, 'manifest2.csv'), error_bad_lines=False)
+
+    # Patient ID and acquisition date
+    pid = df2.at[0, 'patientid']
+    date = dateutil.parser.parse(df2.at[0, 'date'][:11]).date().isoformat()
+
+    # Organise the dicom files
+    # Group the files into subdirectories for each imaging series
+    for series_name, series_df in df2.groupby('series discription'):
+        series_dir = os.path.join(dicom_dir, series_name)
+        if not os.path.exists(series_dir):
+            os.mkdir(series_dir)
+        series_files = [os.path.join(dicom_dir, x) for x in series_df['filename']]
+        os.system('mv {0} {1}'.format(' '.join(series_files), series_dir))
+
+    # Convert dicom files and annotations into nifti images
+    dset = Biobank_Dataset(dicom_dir)
+    dset.read_dicom_images()
+    Path(tmp.name).joinpath('nii').mkdir(exist_ok=True)
+    dset.convert_dicom_to_nifti(os.path.join(tmp.name, 'nii'))
+
+    try:
+        # get corresponding nifti
+        shutil.move(os.path.join(tmp.name, 'nii', 'sa.nii.gz'), output_dir.joinpath('raw', subj_id + '_' + run_id + '_sa.nii.gz'))
+
+    except:
+        print(f'conversion error {subj_id}', file=sys.stderr)
 
     finally:
         # delete tmp directory
         tmp.cleanup()
 
 
+def nii_zipped_la_heart(zip_file, output_dir,
+                   add_id=False,
+                   single_dir=False,
+                   csv='',
+                   verbose=False):
+    """Convert zipped sequences to nifti.
+
+    Converts zipped NAKO DICOM data stored in a sequence folder
+    (e.g.'/mnt/data/rawdata/NAKO_195/NAKO-195_MRT-Dateien/3D_GRE_TRA_W')
+    to .nii files in a defined output folder
+    (such as '/mnt/data/rawdata/NAKO_195_nii/NAKO-195_MRT-Dateien/3D_GRE_TRA_W')
+
+    Args:
+        zip_file (str/Path): zip file to extract
+        output_dir (str/Path): output directory for nifti files
+        add_id (bool): add subject id (parsed from zip filename) as praefix
+        single_dir (bool): save nifti files in a single directory (no subdirs)
+        verbose (bool): activate prints
+    """
+
+    f = Path(zip_file)
+    output_dir = Path(output_dir)
+
+    # create temp directory
+    tmp = tempfile.TemporaryDirectory()
+    # get subject id
+    subj_id = re.match('.*([0-9]{7}).*', f.name).group(1)
+    run_id = f.name.split('_')[2]
+
+    if output_dir.joinpath('raw', subj_id + '_' + run_id + '_la_4ch.nii.gz').exists():
+        print(f'{subj_id} already converted', file=sys.stdout)
+        return
+
+    if verbose:
+        print('unzipping: ', f)
+
+    # unzip to temp directory
+    try:
+        unzip(f, tmp.name)
+    except:
+        print(f'zip error {subj_id}', file=sys.stderr)
+        return
+
+    if verbose:
+        print('converting ... ')
+
+    # create folder with subject id
+    #dest_dir = output_dir.joinpath(subj_id)
+    #dest_dir.mkdir(exist_ok=True)
+    output_dir.joinpath('raw').mkdir(exist_ok=True)
+    output_dir.joinpath('processed').mkdir(exist_ok=True)
+
+    dicom_dir = tmp.name
+
+    if os.path.exists(os.path.join(dicom_dir, 'manifest.cvs')):
+        os.system('cp {0} {1}'.format(os.path.join(dicom_dir, 'manifest.cvs'),
+                                      os.path.join(dicom_dir, 'manifest.csv')))
+    process_manifest(os.path.join(dicom_dir, 'manifest.csv'),
+                     os.path.join(dicom_dir, 'manifest2.csv'))
+    df2 = pd.read_csv(os.path.join(dicom_dir, 'manifest2.csv'), error_bad_lines=False)
+
+    # Patient ID and acquisition date
+    pid = df2.at[0, 'patientid']
+    date = dateutil.parser.parse(df2.at[0, 'date'][:11]).date().isoformat()
+
+    # Organise the dicom files
+    # Group the files into subdirectories for each imaging series
+    for series_name, series_df in df2.groupby('series discription'):
+        series_dir = os.path.join(dicom_dir, series_name)
+        if not os.path.exists(series_dir):
+            os.mkdir(series_dir)
+        series_files = [os.path.join(dicom_dir, x) for x in series_df['filename']]
+        os.system('mv {0} {1}'.format(' '.join(series_files), series_dir))
+
+    # Convert dicom files and annotations into nifti images
+    dset = Biobank_Dataset(dicom_dir)
+    dset.read_dicom_images()
+    Path(tmp.name).joinpath('nii').mkdir(exist_ok=True)
+    dset.convert_dicom_to_nifti(os.path.join(tmp.name, 'nii'))
+
+    try:
+        # get corresponding nifti
+        shutil.move(os.path.join(tmp.name, 'nii', 'la_2ch.nii.gz'), output_dir.joinpath('raw', subj_id + '_' + run_id + '_la_2ch.nii.gz'))
+    except:
+        print(f'conversion error la_2ch_{subj_id}', file=sys.stderr)
+
+    try:
+        shutil.move(os.path.join(tmp.name, 'nii', 'la_3ch.nii.gz'), output_dir.joinpath('raw', subj_id + '_' + run_id + '_la_3ch.nii.gz'))
+    except:
+        print(f'conversion error la_3ch_{subj_id}', file=sys.stderr)
+
+    try:
+        shutil.move(os.path.join(tmp.name, 'nii', 'la_4ch.nii.gz'), output_dir.joinpath('raw', subj_id + '_' + run_id + '_la_4ch.nii.gz'))
+    except:
+        print(f'conversion error la_4ch_{subj_id}', file=sys.stderr)
+
+    finally:
+        # delete tmp directory
+        tmp.cleanup()
+
 if __name__ == '__main__':
     """
     python dcm2nii.py '/path/to/zip_dir' '/path/to/output_dir' (:dixon) (-v) (-cores C) (-csv S)
+    
+    # UKBiobank
+    # brain
+    python dcm2nii.py /mnt/qdata/rawdata/UKBIOBANK/ukbdata/brain/t1/Dicom /mnt/qdata/share/rakuest1/data/UKB/raw/t1_brain --cores 8
+    # heart
+    python dcm2nii.py /mnt/qdata/share/rafruem1/ukb/MRI/raw/ShortAxisHeart /mnt/qdata/share/rakuest1/data/UKB/raw/sa_heart --cores 8
     """
     num_cores = multiprocessing.cpu_count()
 
@@ -487,6 +687,7 @@ if __name__ == '__main__':
                         help='Dicom directories includes different dixon contrasts.')
     parser.add_argument('--nako', action='store_true',
                         help='NAKO database')
+    parser.add_argument('--study', type=str, help='Study type to be converted (UK Biobank)', default='brain')
     parser.add_argument('--id', action='store_true')
     parser.add_argument('--cores', type=int, choices=range(1, num_cores + 1))
     parser.add_argument('--csv', type=str, help='Dump DICOM header as CSV file to specified path (str)', default='')
@@ -508,7 +709,12 @@ if __name__ == '__main__':
                 dcm2nii_zipped(f, out_dir, args.id,
                                args.singledir, args.csv, args.verbose)
         else:
-            nii_zipped(f, out_dir, args.id, args.singledir, args.csv, args.verbose)
+            if args.study == 'brain':
+                nii_zipped_brain(f, out_dir, args.id, args.singledir, args.csv, args.verbose)
+            elif args.study == 'sa_heart':
+                nii_zipped_sa_heart(f, out_dir, args.id, args.singledir, args.csv, args.verbose)
+            elif args.study == 'la_heart':
+                nii_zipped_la_heart(f, out_dir, args.id, args.singledir, args.csv, args.verbose)
 
 
     # single process version

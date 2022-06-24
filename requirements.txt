@@ -13,3 +13,11 @@ wandb
 scikit-image
 batchgenerators
 nilearn
+pydicom
+dicom2nifti
+sklearn
+SimpleITK
+walkdir
+zarr
+batchgenerators
+opencv-python
