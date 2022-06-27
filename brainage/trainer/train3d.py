@@ -1,12 +1,4 @@
-import sys
-sys.path.insert(0, "/home/marci/GIT/nako_ukb_age")
-
 import os
-os.environ["CONFIG"]="/home/marci/GIT/nako_ukb_age/config/volume/config_ukb_heart.yaml"
-
-os.environ["OUT"]="/tmp"
-os.environ["DATA"]="/media/marci/data/ukb"
-
 import time
 from pathlib import Path
 
@@ -56,8 +48,8 @@ def main(args):
         offline_wandb = True
         log_model = False
     else:
-        offline_wandb = True
-        log_model = False
+        offline_wandb = False
+        log_model = True
     patch_size = args.patchsize
     data_mode = args.mode 
     data_augmentation = args.augmentation
@@ -141,6 +133,7 @@ def main(args):
             train_transform = val_transform
 
         if dataset == 'brain':
+            print("Brain")
             ds_train = BrainDataset(data=data_path,
                                 keys=train_keys,
                                 info=info,
@@ -197,7 +190,7 @@ def main(args):
         model = AgeModel3DVolume(args,
                      ds_train, ds_val, offline_wandb, log_model)
 
-    trainer = Trainer(logger=[wandb_logger], )
+    trainer = Trainer(logger=[wandb_logger], gpus=args.gpus, max_epochs=args.max_epochs, benchmark=args.benchmark, val_check_interval=args.val_check_interval)
     trainer.fit(model)
 
 
