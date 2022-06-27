@@ -1,4 +1,12 @@
+import sys
+sys.path.insert(0, "/home/marci/GIT/nako_ukb_age")
+
 import os
+os.environ["CONFIG"]="/home/marci/GIT/nako_ukb_age/config/volume/config_ukb_heart.yaml"
+
+os.environ["OUT"]="/tmp"
+os.environ["DATA"]="/media/marci/data/ukb"
+
 import time
 from pathlib import Path
 
@@ -24,44 +32,44 @@ from brainage.model.model3d import AgeModel3DVolume
 from brainage.model.model2d import AgeModel2DChannels
 from brainage.dataset.dataset3d import BrainDataset, BrainPatchDataset, HeartDataset
 from brainage.dataset.dataset2d import FundusDataset
-from brainage.utils import fix_dict_in_wandb_config
+from brainage.utils import fix_dict_in_wandb_config, train_args
 
 #load_dotenv()
 
 config = os.getenv('CONFIG')
 
-@hydra.main(config_path=os.path.dirname(config), config_name=os.path.splitext(os.path.basename(config))[0])
-def main(cfg):
+# @hydra.main(config_path=os.path.dirname(config), config_name=os.path.splitext(os.path.basename(config))[0])
+def main(args):
     # config
-    project = cfg.project.name
-    job = cfg.project.job
-    data_path = cfg.dataset.data
-    data_group = cfg.dataset.group
-    info = cfg.dataset.info
-    infocolumn = cfg.dataset.column
-    train_set = cfg.dataset.train
-    val_set = cfg.dataset.val
-    debug_set = cfg.dataset.debug or None
+    project = args.name
+    job = args.name
+    data_path = args.datapath
+    data_group = args.group
+    info = args.info
+    infocolumn = args.column
+    train_set = args.train
+    val_set = args.val
+    debug_set = None
     if debug_set:
         train_set = debug_set
         val_set = debug_set
         offline_wandb = True
         log_model = False
     else:
-        offline_wandb = False
-        log_model = True
-    patch_size = cfg.dataset.patch_size
-    data_mode = cfg.dataset.mode 
-    data_augmentation = cfg.dataset.data_augmentation
-    crop_size = np.array(cfg.dataset.crop_size)
-    crop_margins = np.array(cfg.dataset.crop_margins)
-    gamma_range = cfg.dataset.gamma_range
-    mirror_axis = cfg.dataset.mirror_axis
-    preload = cfg.dataset.preload
-    seed = cfg.project.seed or 42
+        offline_wandb = True
+        log_model = False
+    patch_size = args.patchsize
+    data_mode = args.mode 
+    data_augmentation = args.augmentation
+    crop_size = np.array(args.cropsize)
+    crop_margins = np.array(args.cropmargins)
+    gamma_range = args.gammarange
+    mirror_axis = args.mirror
+    preload = args.preload
+    seed = 42
     seed_everything(seed)
     ts = time.gmtime()
-    job_id = 'fold' + f'-{cfg.dataset.fold}-' + time.strftime("%Y-%m-%d-%H-%M-%S", ts)
+    job_id = 'fold' + f'-{args.fold}-' + time.strftime("%Y-%m-%d-%H-%M-%S", ts)
     if 'brain' in job:
         dataset = 'brain'
     elif 'heart' in job:
@@ -77,7 +85,7 @@ def main(cfg):
 
     # logging
     if not offline_wandb:
-        wandb.init(name=f'{job}-{job_id}', entity='lab-midas', project=project, config=OmegaConf.to_container(cfg))
+        wandb.init(name=f'{job}-{job_id}', entity='lab-midas', project=project, config=args)
     wandb_logger = WandbLogger(name=f'{job}-{job_id}', entity='lab-midas', project=project, offline=offline_wandb, log_model=log_model)
     #neptune_logger = NeptuneLogger(project_name=f'lab-midas/{project}',
     #                               params=OmegaConf.to_container(cfg, resolve=True),
@@ -183,16 +191,16 @@ def main(cfg):
                                   transform=val_transform)
 
     if dataset == 'fundus':
-        model = AgeModel2DChannels(OmegaConf.to_container(cfg, resolve=True),
+        model = AgeModel2DChannels(args,
                      ds_train, ds_val, offline_wandb, log_model)
     else:
-        model = AgeModel3DVolume(OmegaConf.to_container(cfg, resolve=True),
+        model = AgeModel3DVolume(args,
                      ds_train, ds_val, offline_wandb, log_model)
 
-    trainer = Trainer(logger=[wandb_logger],
-                      **OmegaConf.to_container(cfg.trainer))
+    trainer = Trainer(logger=[wandb_logger], )
     trainer.fit(model)
 
 
 if __name__ == '__main__':
-    main()
+    args = train_args()
+    main(args)
