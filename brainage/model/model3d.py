@@ -23,7 +23,8 @@ class AgeModel3DVolume(pl.LightningModule):
                 train_ds=None,
                 val_ds=None,
                 offline_wandb=False,
-                log_model=True
+                log_model=True,
+                dataset="brain"
                 ):
         super().__init__()
 
@@ -47,6 +48,7 @@ class AgeModel3DVolume(pl.LightningModule):
         self.no_max_pool = args.nomaxpool or False
         self.offline_wandb = offline_wandb
         self.log_model = log_model
+        self.dataset = dataset
 
         if self.loss_type == 'l2':
             self.loss_criterion = l2_loss(heteroscedastic=self.heteroscedastic)
@@ -85,7 +87,7 @@ class AgeModel3DVolume(pl.LightningModule):
                 imgc = img[0, :, :, int(img.size()[2] // 2)].cpu().numpy() * 255.0
             samples.append(wandb.Image(imgc, caption=f'batch {batch_idx} age {label}'))
         if not self.offline_wandb:
-            wandb.log({'samples': samples})
+            self.logger.experiment.log({'samples': samples})
 
     def training_step(self, batch, batch_idx):
         x = batch['data'].float()

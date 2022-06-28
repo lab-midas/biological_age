@@ -37,7 +37,7 @@ def train_args():
 
     parser = argparse.ArgumentParser(description="Train age prediction network")
     parser.add_argument("--name", default="ukb_t1brain_volume", type=str, help="Jobname")
-    parser.add_argument("--gpus", default=2, type=int, help="Number of GPUS")
+    parser.add_argument("--gpus", default=4, type=int, help="Number of GPUS")
     parser.add_argument("--max_epochs", default=200, type=int, help="Number of epochs")
     parser.add_argument("--benchmark", default=True, type=bool, help="Benchmark")
     parser.add_argument("--val_check_interval", default=1.0, type=float, help="Val Check Intervall")
@@ -62,17 +62,17 @@ def train_args():
     parser.add_argument("--wd", default=0, type=float, help="Weight Decay")
 
     parser.add_argument("--batch", default=128, type=int, help="Batch Size")
-    parser.add_argument("--workers", default=4, type=int, help="Num Workers")
+    parser.add_argument("--workers", default=12, type=int, help="Num Workers")
     
     parser.add_argument("--mode", default="volume", type=str, help="Data Mode")
-    parser.add_argument("--datapath", default="/mnt/qdata/share/rakuest1/data/UKB/interim/ukb_brain_preprocessed.h5", type=str, help="Path to Data")
+    parser.add_argument("--datapath", default="/mnt/qdata/ukb/UKB/interim/ukb_brain_preprocessed.h5", type=str, help="Path to Data")
     parser.add_argument("--group", default="image", type=str, help="Data Group")
-    parser.add_argument("--info", default="/mnt/qdata/share/rakuest1/data/UKB/interim/ukb_all.csv", type=str, help="Data Info")
+    parser.add_argument("--info", default="/mnt/qdata/ukb/UKB/interim/ukb_all.csv", type=str, help="Data Info")
     parser.add_argument("--column", default="age", type=str, help="Data Info Column")
     parser.add_argument("--preload", default=False, type=bool, help="Preload Data")
     parser.add_argument("--fold", default=0, type=int, help="Fold")
-    parser.add_argument("--train", default="/mnt/qdata/share/rakuest1/data/UKB/interim/keys/train_imaging.dat", type=str, help="Train Split")
-    parser.add_argument("--val", default="/mnt/qdata/share/rakuest1/data/UKB/interim/keys/test.dat", type=str, help="Val Split")
+    parser.add_argument("--train", default="/mnt/qdata/ukb/UKB/interim/keys/train_imaging.dat", type=str, help="Train Split")
+    parser.add_argument("--val", default="/mnt/qdata/ukb/UKB/interim/keys/test.dat", type=str, help="Val Split")
 
     parser.add_argument("--augmentation", default=True, type=bool, help="Data Augmentation")
     parser.add_argument("--cropsize", default=None, type=int, help="Crop Size")
@@ -81,6 +81,7 @@ def train_args():
     parser.add_argument("--patchsize", default=None, type=int, help="Patch Size")
     parser.add_argument("--mirror", default=None, type=int, help="Mirror Axis")
 
+    parser.add_argument("--NODE_RANK", type=int, default=-1, metavar="N", help="Local process rank.")
 
 
 

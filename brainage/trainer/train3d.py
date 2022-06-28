@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 from pathlib import Path
 
@@ -31,8 +32,11 @@ from brainage.utils import fix_dict_in_wandb_config, train_args
 config = os.getenv('CONFIG')
 
 # @hydra.main(config_path=os.path.dirname(config), config_name=os.path.splitext(os.path.basename(config))[0])
-def main(args):
+def main():
+    args = train_args()
     # config
+    print("Rank: ", sys.argv)
+
     project = args.name
     job = args.name
     data_path = args.datapath
@@ -61,7 +65,7 @@ def main(args):
     seed = 42
     seed_everything(seed)
     ts = time.gmtime()
-    job_id = 'fold' + f'-{args.fold}-' + time.strftime("%Y-%m-%d-%H-%M-%S", ts)
+    job_id = 'fold' + f'-{args.fold}-'
     if 'brain' in job:
         dataset = 'brain'
     elif 'heart' in job:
@@ -75,10 +79,6 @@ def main(args):
     elif 'fundus' in job:
         dataset = 'fundus'
 
-    # logging
-    if not offline_wandb:
-        wandb.init(name=f'{job}-{job_id}', entity='lab-midas', project=project, config=args)
-    wandb_logger = WandbLogger(name=f'{job}-{job_id}', entity='lab-midas', project=project, offline=offline_wandb, log_model=log_model)
     #neptune_logger = NeptuneLogger(project_name=f'lab-midas/{project}',
     #                               params=OmegaConf.to_container(cfg, resolve=True),
     #                               experiment_name=f'{job}-{job_id}',
@@ -159,12 +159,12 @@ def main(args):
                                     transform=train_transform)
 
             ds_val = HeartDataset(data=data_path,
-                                  keys=val_keys,
-                                  info=info,
-                                  column=infocolumn,
-                                  group=data_group,
-                                  preload=preload,
-                                  transform=val_transform)
+                                keys=val_keys,
+                                info=info,
+                                column=infocolumn,
+                                group=data_group,
+                                preload=preload,
+                                transform=val_transform)
 
         elif dataset == 'fundus':
             ds_train = FundusDataset(data=data_path,
@@ -176,24 +176,30 @@ def main(args):
                                     transform=train_transform)
 
             ds_val = FundusDataset(data=data_path,
-                                  keys=val_keys,
-                                  info=info,
-                                  column=infocolumn,
-                                  group=data_group,
-                                  preload=preload,
-                                  transform=val_transform)
-
+                                keys=val_keys,
+                                info=info,
+                                column=infocolumn,
+                                group=data_group,
+                                preload=preload,
+                                transform=val_transform)
     if dataset == 'fundus':
         model = AgeModel2DChannels(args,
-                     ds_train, ds_val, offline_wandb, log_model)
+                    ds_train, ds_val, offline_wandb, log_model)
     else:
         model = AgeModel3DVolume(args,
-                     ds_train, ds_val, offline_wandb, log_model)
+                    ds_train, ds_val, offline_wandb, log_model)
 
-    trainer = Trainer(logger=[wandb_logger], gpus=args.gpus, max_epochs=args.max_epochs, benchmark=args.benchmark, val_check_interval=args.val_check_interval)
+    
+    if not offline_wandb:
+        # wandb.init(name=f'{job}-{job_id}', entity='lab-midas', project=project, config=args)
+        wandb_logger = WandbLogger(name=f'{job}-{job_id}', entity='lab-midas', project=project, offline=offline_wandb, log_model=log_model)
+    
+    trainer = Trainer(logger=[wandb_logger], gpus=args.gpus, max_epochs=args.max_epochs,
+    benchmark=args.benchmark, val_check_interval=args.val_check_interval, strategy="ddp")
+
+
     trainer.fit(model)
 
 
 if __name__ == '__main__':
-    args = train_args()
-    main(args)
+    main()
