@@ -37,7 +37,7 @@ def train_args():
 
     parser = argparse.ArgumentParser(description="Train age prediction network")
     parser.add_argument("--name", default="ukb_t1brain_volume", type=str, help="Jobname")
-    parser.add_argument("--gpus", default=1, type=int, help="Number of GPUS")
+    parser.add_argument("--gpus", default=2, type=int, help="Number of GPUS")
     parser.add_argument("--max_epochs", default=200, type=int, help="Number of epochs")
     parser.add_argument("--benchmark", default=True, type=bool, help="Benchmark")
     parser.add_argument("--val_check_interval", default=1.0, type=float, help="Val Check Intervall")
@@ -50,10 +50,12 @@ def train_args():
     parser.add_argument("--pretrained", default=True, type=bool, help="Pretrained")
     parser.add_argument("--loss", default="l2", type=str, help="Loss function")
     parser.add_argument("--heteroscedastic", default=True, type=bool, help="Heteroscedastic")
-    parser.add_argument("--position", default=True, type=bool, help="Position")
+    parser.add_argument("--position", default=False, type=bool, help="Position")
     parser.add_argument("--norm", default=None, type=str, help="Norm")
     parser.add_argument("--strides", default=[1,1,1,2], type=list, help="Strides")
     parser.add_argument("--nomaxpool", default=False, type=bool, help="Dont use max pool")
+    parser.add_argument("--use_layer", default=3, type=int, help="Layers to use")
+
     
 
     parser.add_argument("--lr", default=1e-4, type=float, help="Learning Rate")

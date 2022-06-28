@@ -35,7 +35,7 @@ class BrainDataset(AbstractDataset):
         #if ukb:
         #    info_df = pd.read_csv(info, index_col=0, usecols=[1,2,3,4,5], dtype={'key': 'string', column: np.float32})
         #else:
-        info_df = pd.read_csv(info, index_col=0, dtype={'key': 'string', column: np.float32})
+        info_df = pd.read_csv(info, index_col=1, dtype={'key': 'string', column: np.float32})
         self.keys = [l.strip() for l in Path(keys).open().readlines()] if isinstance(keys, str) else keys
 
         self.logger.info('loading h5 dataset ...')

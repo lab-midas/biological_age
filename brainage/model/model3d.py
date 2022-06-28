@@ -40,7 +40,7 @@ class AgeModel3DVolume(pl.LightningModule):
         self.weight_decay = args.wd or 0.0
         self.batch_size = args.batch or 8
         self.num_workers = args.workers or 4
-        self.use_layer = None or [1,1,1,1]
+        self.use_layer = args.use_layer or 3
         self.strides = args.strides
         self.train_ds = train_ds
         self.val_ds = val_ds
@@ -79,8 +79,10 @@ class AgeModel3DVolume(pl.LightningModule):
     def log_samples(self, batch, batch_idx):
         samples = []
         for img, label in zip(batch['data'], batch['label']):
-            #img = img[0, :, img.size()[1]//2, :].cpu().numpy()*255.0  # brain
-            imgc = img[0, :, :, :].cpu().numpy() * 255.0
+            if self.dataset == 'brain':
+                imgc = img[0, :, img.size()[1]//2, :].cpu().numpy() * 255.0
+            else:
+                imgc = img[0, :, :, int(img.size()[2] // 2)].cpu().numpy() * 255.0
             samples.append(wandb.Image(imgc, caption=f'batch {batch_idx} age {label}'))
         if not self.offline_wandb:
             wandb.log({'samples': samples})

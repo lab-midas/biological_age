@@ -155,7 +155,7 @@ class ResNet(nn.Module):
                  norm_type='BN',
                  widen_factor=1.0,
                  n_classes=400,
-                 use_layer=[1,1,1,1],
+                 use_layer=3,
                  strides=[1,2,2,2],
                  use_position=False):
         super().__init__()
@@ -179,7 +179,8 @@ class ResNet(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool3d(kernel_size=3, stride=2, padding=1)
 
-        self.use_layer = use_layer 
+        self.use_layer = use_layer
+        print(self.use_layer)
 
         if self.use_layer == 1:
             self.layer1 = self._make_layer(block, 
