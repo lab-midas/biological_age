@@ -184,10 +184,10 @@ def main(cfg):
 
     if dataset == 'fundus':
         model = AgeModel2DChannels(OmegaConf.to_container(cfg, resolve=True),
-                     ds_train, ds_val, offline_wandb, log_model)
+                     ds_train, ds_val, offline_wandb, log_model, dataset)
     else:
         model = AgeModel3DVolume(OmegaConf.to_container(cfg, resolve=True),
-                     ds_train, ds_val, offline_wandb, log_model)
+                     ds_train, ds_val, offline_wandb, log_model, dataset)
 
     trainer = Trainer(logger=[wandb_logger],
                       **OmegaConf.to_container(cfg.trainer))

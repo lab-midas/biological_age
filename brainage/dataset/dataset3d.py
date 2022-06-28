@@ -126,7 +126,7 @@ class HeartDataset(AbstractDataset):
                         break
                     else:
                         keyh5 = ''
-                        
+
                 fhandle = h5py.File(data.joinpath(keyh5 + '_sa.h5'), 'r')
                 if self.preload:
                     data = fhandle[f'{group_str}{keyh5}'][:]

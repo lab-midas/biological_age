@@ -161,7 +161,8 @@ class AgeModel2DChannels(pl.LightningModule):
                  train_ds=None,
                  val_ds=None,
                  offline_wandb=False,
-                 log_model=True):
+                 log_model=True,
+                 dataset='fundus'):
         super().__init__()
 
         # copy over
@@ -185,6 +186,7 @@ class AgeModel2DChannels(pl.LightningModule):
         self.no_max_pool = cfg.model.no_max_pool or False
         self.offline_wandb = offline_wandb
         self.log_model = log_model
+        self.dataset = dataset
 
         if self.loss_type == 'l2':
             self.loss_criterion = l2_loss(heteroscedastic=self.heteroscedastic)
