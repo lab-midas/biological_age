@@ -19,6 +19,8 @@ import math
 from image_utils import rescale_intensity
 from skimage.measure import label, regionprops
 import argparse
+from joblib import Parallel, delayed
+
 
 def segment_heart(data_list, seq_name='sa', seg4=False, save_seg=True, save_path='./seg'):
     # data_list         list of nifti files to process (full string path)
@@ -310,7 +312,7 @@ def crop(x, s, c):
         else:
             upper_pad = 0
 
-        idx.append(list(np.arange(lower, upper, dtype=np.int)))
+        idx.append(list(np.arange(lower, upper, dtype=int)))
         idx_pad += (low_pad, upper_pad),
 
     index_arrays = np.ix_(*idx)
@@ -345,7 +347,7 @@ def write_keys(input_dir, output_dir, output_file, verbose=False):
     return keys
 
 
-def convert_nifti_h5(input_dir, output_dir, output_file, save_path, verbose=False):
+def convert_nifti_h5(input_dir, output_dir, output_file, save_path, single_file=True, verbose=False):
     # Create output directory if it does not exist
     output_dir.mkdir(exist_ok=True)
 
@@ -353,9 +355,13 @@ def convert_nifti_h5(input_dir, output_dir, output_file, save_path, verbose=Fals
     nifti_files = [f for f in input_dir.glob('*.nii.gz')]
 
     # Create list of all h5 files in output_dir
-    h5_file = output_dir.joinpath(output_file)
+    if single_file:
+        h5_file = output_dir.joinpath(output_file)
+    else:
+        h5_dir = output_dir.joinpath(Path(output_file).stem)
+        h5_dir.mkdir(exist_ok=True)
 
-    if os.path.exists(h5_file):
+    if single_file and os.path.exists(h5_file):
         print('{} already exists'.format(h5_file))
         #return pickle.load(open(output_dir.joinpath('keys', 'all.dat'), 'r'))
         return [l.strip() for l in output_dir.joinpath('keys', 'all.dat').open().readlines()]
@@ -380,12 +386,13 @@ def convert_nifti_h5(input_dir, output_dir, output_file, save_path, verbose=Fals
 
     keys = []
     plot_path = Path(save_path).parent.joinpath('qualicheck')
-    hf = h5py.File(h5_file, 'w')
-    grp_image = hf.create_group('image')
-    grp_affine = hf.create_group('affine')
-    for nifti_file in tqdm(nifti_files):
+
+    def process_file(nifti_file):
         keyh5 = nifti_file.stem.split('.')[0]
         key = keyh5.split('_')[0]
+
+        if not single_file and h5_dir.joinpath(keyh5 + '.h5').exists():
+            return
 
         img = nib.load(nifti_file)
         img_data = img.get_fdata().astype(np.float32)
@@ -394,9 +401,10 @@ def convert_nifti_h5(input_dir, output_dir, output_file, save_path, verbose=Fals
         # find patient
         if not '_'.join(keyh5.split('_')[0:2]) in pat_list:
             print('Patient mask extraction failed: ' + keyh5)
-            continue
+            return
         box = bounding_boxes_ED[pat_list.index('_'.join(keyh5.split('_')[0:2]))]
-        center = list(np.floor(np.asarray(box[0:3], dtype='int') + np.asarray(box[3:6], dtype='int') / 2)) + [np.floor(np.shape(img_data)[3] / 2)]
+        center = list(np.floor(np.asarray(box[0:3], dtype='int') + np.asarray(box[3:6], dtype='int') / 2)) + [
+            np.floor(np.shape(img_data)[3] / 2)]
         center = [int(x) for x in center]
         # list(box[0:2] + np.floor(np.asarry(sel_shape[0:2]) / 2)) + list(np.floor(np.asarry(box[5] + box[2])/2)) +
 
@@ -407,13 +415,36 @@ def convert_nifti_h5(input_dir, output_dir, output_file, save_path, verbose=Fals
         Path(save_path_curr).mkdir(exist_ok=True)
 
         # Write to h5 file
-        grp_image.create_dataset(keyh5, data=img_crop)
-        grp_affine.create_dataset(keyh5, data=affine)
+        if single_file:
+            grp_image.create_dataset(keyh5, data=img_crop)
+            grp_affine.create_dataset(keyh5, data=affine)
+        else:
+            h5file = h5py.File(h5_dir.joinpath(keyh5 + '.h5'), 'w')
+            grps_image = h5file.create_group('image')
+            grps_affine = h5file.create_group('affine')
+            grps_image.create_dataset(keyh5, data=img_crop)
+            grps_affine.create_dataset(keyh5, data=affine)
 
         # Quality check
-        #plt.imshow(img_crop[:, :, int(np.floor(np.shape(img_crop)[2]/2)), 0])
-        #plt.savefig(plot_path.joinpath(keyh5 + '.png'))
+        # plt.imshow(img_crop[:, :, int(np.floor(np.shape(img_crop)[2]/2)), 0])
+        # plt.savefig(plot_path.joinpath(keyh5 + '.png'))
 
+    if single_file:
+        hf = h5py.File(h5_file, 'w')
+        grp_image = hf.create_group('image')
+        grp_affine = hf.create_group('affine')
+        for nifti_file in tqdm(nifti_files):
+            process_file(nifti_file)
+    else:
+        num_cores = 16
+        print(f'using {num_cores} CPU cores')
+
+        t = time.time()
+        results = Parallel(n_jobs=num_cores)(
+            delayed(process_file)(f) for f in tqdm(nifti_files))
+        elapsed_time = time.time() - t
+
+        print(f'elapsed time: {time.strftime("%H:%M:%S", time.gmtime(elapsed_time))}')
 
 def main():
     parser = argparse.ArgumentParser(description='Preprocessing pipeline for UK Biobank SA Heart MRI data.\n' \
@@ -441,7 +472,7 @@ def main():
     #nifti_files = [f for f in Path(input_dir).glob('*.nii.gz')]
     #segment_heart(nifti_files, save_path=save_path)
     #get_bounding_boxes(save_path)
-    convert_nifti_h5(input_dir, output_dir, args.output_file, save_path, verbose=False)
+    convert_nifti_h5(input_dir, output_dir, args.output_file, save_path, single_file=False, verbose=False)
 
 
 if __name__ == '__main__':

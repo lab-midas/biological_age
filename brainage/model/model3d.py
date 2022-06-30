@@ -24,7 +24,7 @@ class AgeModel3DVolume(pl.LightningModule):
                 val_ds=None,
                 offline_wandb=False,
                 log_model=True,
-                dataset="brain"
+                dataset='brain'
                 ):
         super().__init__()
 

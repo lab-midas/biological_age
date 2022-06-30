@@ -33,19 +33,19 @@ config = os.getenv('CONFIG')
 
 # @hydra.main(config_path=os.path.dirname(config), config_name=os.path.splitext(os.path.basename(config))[0])
 def main():
-    args = train_args()
+    cfg = train_args()
     # config
-    print("Rank: ", sys.argv)
+    #print("Rank: ", sys.argv)
 
-    project = args.name
-    job = args.name
-    data_path = args.datapath
-    data_group = args.group
-    info = args.info
-    infocolumn = args.column
-    train_set = args.train
-    val_set = args.val
-    debug_set = None
+    project = cfg['project']['name']
+    job = cfg['project']['job']
+    data_path = cfg['dataset']['data']
+    data_group = cfg['dataset']['group']
+    info = cfg['dataset']['info']
+    infocolumn = cfg['dataset']['column']
+    train_set = cfg['dataset']['train']
+    val_set = cfg['dataset']['val']
+    debug_set = cfg['dataset']['debug'] or None
     if debug_set:
         train_set = debug_set
         val_set = debug_set
@@ -54,14 +54,15 @@ def main():
     else:
         offline_wandb = False
         log_model = True
-    patch_size = args.patchsize
-    data_mode = args.mode 
-    data_augmentation = args.augmentation
-    crop_size = np.array(args.cropsize)
-    crop_margins = np.array(args.cropmargins)
-    gamma_range = args.gammarange
-    mirror_axis = args.mirror
-    preload = args.preload
+    patch_size = cfg['dataset']['patch_size']
+    data_mode = cfg['dataset']['mode']
+    data_augmentation = cfg['dataset']['data_augmentation']
+    crop_size = np.array(cfg['dataset']['crop_size'])
+    crop_margins = np.array(cfg['dataset']['crop_margins'])
+    gamma_range = cfg['dataset']['gamma_range']
+    mirror_axis = cfg['dataset']['mirror_axis']
+    preload = cfg['dataset']['preload']
+    meta = cfg['model']['position']
     seed = 42
     seed_everything(seed)
     ts = time.gmtime()
@@ -140,6 +141,7 @@ def main():
                                 group=data_group,
                                 column=infocolumn,
                                 preload=preload,
+                                meta=meta,
                                 transform=train_transform)
 
             ds_val = BrainDataset(data=data_path,
@@ -148,6 +150,7 @@ def main():
                                 column=infocolumn,
                                 group=data_group,
                                 preload=preload,
+                                meta=meta,
                                 transform=val_transform)
         elif dataset == 'heart':
             ds_train = HeartDataset(data=data_path,
@@ -156,15 +159,17 @@ def main():
                                     group=data_group,
                                     column=infocolumn,
                                     preload=preload,
+                                    meta=meta,
                                     transform=train_transform)
 
             ds_val = HeartDataset(data=data_path,
-                                keys=val_keys,
-                                info=info,
-                                column=infocolumn,
-                                group=data_group,
-                                preload=preload,
-                                transform=val_transform)
+                                  keys=val_keys,
+                                  info=info,
+                                  column=infocolumn,
+                                  group=data_group,
+                                  preload=preload,
+                                  meta=meta,
+                                  transform=val_transform)
 
         elif dataset == 'fundus':
             ds_train = FundusDataset(data=data_path,
@@ -173,21 +178,24 @@ def main():
                                     group=data_group,
                                     column=infocolumn,
                                     preload=preload,
+                                    meta=meta,
                                     transform=train_transform)
 
             ds_val = FundusDataset(data=data_path,
-                                keys=val_keys,
-                                info=info,
-                                column=infocolumn,
-                                group=data_group,
-                                preload=preload,
-                                transform=val_transform)
+                                  keys=val_keys,
+                                  info=info,
+                                  column=infocolumn,
+                                  group=data_group,
+                                  preload=preload,
+                                  meta=meta,
+                                  transform=val_transform)
+
     if dataset == 'fundus':
-        model = AgeModel2DChannels(args,
-                    ds_train, ds_val, offline_wandb, log_model)
+        model = AgeModel2DChannels(OmegaConf.to_container(cfg, resolve=True),
+                     ds_train, ds_val, offline_wandb, log_model, dataset)
     else:
-        model = AgeModel3DVolume(args,
-                    ds_train, ds_val, offline_wandb, log_model)
+        model = AgeModel3DVolume(OmegaConf.to_container(cfg, resolve=True),
+                     ds_train, ds_val, offline_wandb, log_model, dataset)
 
     
     if not offline_wandb:

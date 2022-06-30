@@ -12,11 +12,6 @@ export PRJ=/home/rakuest1/Documents/nako_ukb_age  # denbi
 export DATA=/mnt/qdata/share/rakuest1/data
 export OUT=/mnt/qdata/share/rakuest1/results/UKB
 export PATH=/opt/conda/rakuest1/envs/nakoukb/bin:/opt/miniconda3/condabin:$PATH
-#export HTTP_PROXY=http://rakuest1:13Pommes28@httpproxy.zit.med.uni-tuebingen.de:88/
-#export HTTPS_PROXY=http://rakuest1:13Pommes28@httpproxy.zit.med.uni-tuebingen.de:88/
-#export http_proxy=http://rakuest1:13Pommes28@httpproxy.zit.med.uni-tuebingen.de:88/
-#export https_proxy=http://rakuest1:13Pommes28@httpproxy.zit.med.uni-tuebingen.de:88/
-
 
 module load cuda/11.3
 export CONFIG=$PRJ/config/volume/config_ukb_fundus.yaml
