@@ -1,8 +1,8 @@
 hydra:
   run:
-    dir: ${env:OUT}/${project.name}/${project.job}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: !ENV ${OUT}/${project.name}/${project.job}/${now:%Y-%m-%d}/${now:%H-%M-%S}
   sweep:
-    dir: ${env:OUT}/${project.name}/${project.job}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: !ENV ${OUT}/${project.name}/${project.job}/${now:%Y-%m-%d}/${now:%H-%M-%S}
 
 project:
   name: age
@@ -42,16 +42,16 @@ loader:
 
 dataset:
   mode: volume
-  data: ${env:DATA}/UKB/interim/ukb_brain_preprocessed.h5
+  data: !ENV ${DATA}/UKB/interim/ukb_brain_preprocessed.h5
   group: image
-  info: ${env:DATA}/UKB/interim/ukb_all.csv
+  info: !ENV ${DATA}/UKB/interim/ukb_all.csv
   column: age
   preload: False
   fold: 0
-  train: ${env:DATA}/UKB/interim/keys/train_imaging.dat
-  val:   ${env:DATA}/UKB/interim/keys/test.dat
+  train: !ENV ${DATA}/UKB/interim/keys/train_imaging.dat
+  val:   !ENV ${DATA}/UKB/interim/keys/test.dat
   debug:
-  #debug: ${env:DATA}/UKB/interim/keys/debug.dat
+  #debug: !ENV ${DATA}/UKB/interim/keys/debug.dat
   data_augmentation: True
   crop_size:
   crop_margins:
