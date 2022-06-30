@@ -36,7 +36,7 @@ def train_args():
     """
 
     parser = argparse.ArgumentParser(description="Train age prediction network")
-    parser.add_argument("--name", default="ukb_t1brain_volume", type=str, help="Jobname")
+    parser.add_argument("--name", default="ukb_age_fundus", type=str, help="Jobname")
     parser.add_argument("--gpus", default=4, type=int, help="Number of GPUS")
     parser.add_argument("--max_epochs", default=200, type=int, help="Number of epochs")
     parser.add_argument("--benchmark", default=True, type=bool, help="Benchmark")
@@ -45,7 +45,7 @@ def train_args():
 
     parser.add_argument("--model", default='resnet18', type=str, help="Model Name")
     parser.add_argument("--depth", default=18, type=int, help="Model Depth")
-    parser.add_argument("--inputs", default=1, type=int, help="Inputs")
+    parser.add_argument("--inputs", default=3, type=int, help="Inputs")
     parser.add_argument("--outputs", default=2, type=int, help="Output")
     parser.add_argument("--pretrained", default=True, type=bool, help="Pretrained")
     parser.add_argument("--loss", default="l2", type=str, help="Loss function")
@@ -61,23 +61,23 @@ def train_args():
     parser.add_argument("--lr", default=1e-4, type=float, help="Learning Rate")
     parser.add_argument("--wd", default=0, type=float, help="Weight Decay")
 
-    parser.add_argument("--batch", default=128, type=int, help="Batch Size")
+    parser.add_argument("--batch", default=8, type=int, help="Batch Size")
     parser.add_argument("--workers", default=12, type=int, help="Num Workers")
     
     parser.add_argument("--mode", default="volume", type=str, help="Data Mode")
-    parser.add_argument("--datapath", default="/mnt/qdata/ukb/UKB/interim/ukb_brain_preprocessed.h5", type=str, help="Path to Data")
+    parser.add_argument("--datapath", default="/mnt/qdata/ukb/UKB/interim/ukb_fundus_preprocessed.h5", type=str, help="Path to Data")
     parser.add_argument("--group", default="image", type=str, help="Data Group")
     parser.add_argument("--info", default="/mnt/qdata/ukb/UKB/interim/ukb_all.csv", type=str, help="Data Info")
     parser.add_argument("--column", default="age", type=str, help="Data Info Column")
     parser.add_argument("--preload", default=False, type=bool, help="Preload Data")
     parser.add_argument("--fold", default=0, type=int, help="Fold")
-    parser.add_argument("--train", default="/mnt/qdata/ukb/UKB/interim/keys/train_imaging.dat", type=str, help="Train Split")
-    parser.add_argument("--val", default="/mnt/qdata/ukb/UKB/interim/keys/test.dat", type=str, help="Val Split")
+    parser.add_argument("--train", default="/mnt/qdata/ukb/UKB/interim/keys/train_fundus.dat", type=str, help="Train Split")
+    parser.add_argument("--val", default="/mnt/qdata/ukb/UKB/interim/keys/test_fundus.dat", type=str, help="Val Split")
 
     parser.add_argument("--augmentation", default=True, type=bool, help="Data Augmentation")
     parser.add_argument("--cropsize", default=None, type=int, help="Crop Size")
     parser.add_argument("--cropmargins", default=None, type=int, help="Crop Margins")
-    parser.add_argument("--gammarange", default=[0.7, 1.3], type=list, help="Gamma Range")
+    parser.add_argument("--gammarange", default=[0.9, 1.1], type=list, help="Gamma Range")
     parser.add_argument("--patchsize", default=None, type=int, help="Patch Size")
     parser.add_argument("--mirror", default=None, type=int, help="Mirror Axis")
 
