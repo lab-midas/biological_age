@@ -37,7 +37,7 @@ class AgeModel3DVolume(pl.LightningModule):
         self.loss_type = cfg['model']['loss'] or 'l2'
         self.heteroscedastic = cfg['model']['heteroscedastic'] or False
         self.norm_type = cfg['model']['norm'] or 'IN'
-        self.learning_rate = cfg['optimizer']['learning_rate'] or 1e-4
+        self.learning_rate = float(cfg['optimizer']['learning_rate']) or 1e-4
         self.weight_decay = cfg['optimizer']['weight_decay'] or 0.0
         self.batch_size = cfg['loader']['batch_size'] or 8
         self.num_workers = cfg['loader']['num_workers'] or 4

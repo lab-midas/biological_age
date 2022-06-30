@@ -66,7 +66,7 @@ def main():
     seed = 42
     seed_everything(seed)
     ts = time.gmtime()
-    job_id = 'fold' + f'-{cfg.dataset.fold}-' + time.strftime("%Y-%m-%d-%H-%M-%S", ts)
+    job_id = 'fold' + f'-{cfg["dataset"]["fold"]}-' + time.strftime("%Y-%m-%d-%H-%M-%S", ts)
     if 'brain' in job:
         dataset = 'brain'
     elif 'heart' in job:

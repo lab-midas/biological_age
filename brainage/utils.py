@@ -121,7 +121,7 @@ def train_args():
     parser.add_argument("--val_check_interval", default=1.0, type=float, help="Val Check Intervall")
 
 
-    parser.add_argument("--model", default='resnet18', type=str, help="Model Name")
+    parser.add_argument("--modelName", default='resnet18', type=str, help="Model Name")
     parser.add_argument("--depth", default=18, type=int, help="Model Depth")
     parser.add_argument("--inputs", default=3, type=int, help="Inputs")
     parser.add_argument("--outputs", default=2, type=int, help="Output")
@@ -158,8 +158,6 @@ def train_args():
     parser.add_argument("--gamma_range", default=[0.9, 1.1], type=list, help="Gamma Range")
     parser.add_argument("--patch_size", default=None, type=int, help="Patch Size")
     parser.add_argument("--mirror_axis", default=None, type=int, help="Mirror Axis")
-
-    parser.add_argument("--NODE_RANK", type=int, default=-1, metavar="N", help="Local process rank.")
 
 
     args = parser.parse_args()
