@@ -191,23 +191,20 @@ def main():
                                   transform=val_transform)
 
     if dataset == 'fundus':
-        model = AgeModel2DChannels(OmegaConf.to_container(cfg, resolve=True),
-                     ds_train, ds_val, offline_wandb, log_model, dataset)
+        model = AgeModel2DChannels(cfg, ds_train, ds_val, offline_wandb, log_model, dataset)
     else:
-        model = AgeModel3DVolume(OmegaConf.to_container(cfg, resolve=True),
-                     ds_train, ds_val, offline_wandb, log_model, dataset)
+        model = AgeModel3DVolume(cfg, ds_train, ds_val, offline_wandb, log_model, dataset)
 
     
     if not offline_wandb:
         # wandb.init(name=f'{job}-{job_id}', entity='lab-midas', project=project, config=args)
         wandb_logger = WandbLogger(name=f'{job}-{job_id}', entity='lab-midas', project=project, offline=offline_wandb, log_model=log_model)
     
-    trainer = Trainer(logger=[wandb_logger], gpus=args.gpus, max_epochs=args.max_epochs,
-                        benchmark=args.benchmark, val_check_interval=args.val_check_interval,strategy="ddp"
-                        )
+    trainer = Trainer(logger=[wandb_logger], gpus=cfg['trainer']['gpus'], max_epochs=cfg['trainer']['max_epochs'],
+                        benchmark=cfg['trainer']['benchmark'], val_check_interval=cfg['trainer']['val_check_interval'], strategy="ddp")
 
     if trainer.global_rank == 0:
-        wandb_logger.experiment.config.update(args)
+        wandb_logger.experiment.config.update(cfg)
 
     trainer.fit(model)
 

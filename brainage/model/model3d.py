@@ -19,7 +19,7 @@ from brainage.model.architecture.simple import SimpleCNN
 class AgeModel3DVolume(pl.LightningModule):
 
     def __init__(self,
-                args,
+                cfg,
                 train_ds=None,
                 val_ds=None,
                 offline_wandb=False,
@@ -30,22 +30,22 @@ class AgeModel3DVolume(pl.LightningModule):
 
         # copy over
         #self.hparams = hparams
-        self.model_depth = args.depth or 18
-        self.inputs = args.inputs or 3
-        self.outputs = args.outputs or 1
-        self.use_position = args.position or False
-        self.loss_type = args.loss or 'l2'
-        self.heteroscedastic = args.heteroscedastic or False
-        self.norm_type = args.norm or 'IN'
-        self.learning_rate = args.lr or 1e-4
-        self.weight_decay = args.wd or 0.0
-        self.batch_size = args.batch or 8
-        self.num_workers = args.workers or 4
-        self.use_layer = args.use_layer or 3
-        self.strides = args.strides
+        self.model_depth = cfg['model']['depth'] or 18
+        self.inputs = cfg['model']['inputs'] or 3
+        self.outputs = cfg['model']['outputs'] or 1
+        self.use_position = cfg['model']['position'] or False
+        self.loss_type = cfg['model']['loss'] or 'l2'
+        self.heteroscedastic = cfg['model']['heteroscedastic'] or False
+        self.norm_type = cfg['model']['norm'] or 'IN'
+        self.learning_rate = cfg['optimizer']['learning_rate'] or 1e-4
+        self.weight_decay = cfg['optimizer']['weight_decay'] or 0.0
+        self.batch_size = cfg['loader']['batch_size'] or 8
+        self.num_workers = cfg['loader']['num_workers'] or 4
+        self.use_layer = cfg['model']['use_layer'] or 3
+        self.strides = cfg['model']['strides']
         self.train_ds = train_ds
         self.val_ds = val_ds
-        self.no_max_pool = args.nomaxpool or False
+        self.no_max_pool = cfg['model']['no_max_pool'] or False
         self.offline_wandb = offline_wandb
         self.log_model = log_model
         self.dataset = dataset
