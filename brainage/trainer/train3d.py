@@ -58,6 +58,7 @@ def main(cfg):
     gamma_range = cfg.dataset.gamma_range
     mirror_axis = cfg.dataset.mirror_axis
     preload = cfg.dataset.preload
+    meta = cfg.model.position  # use meta information (gender) or not
     seed = cfg.project.seed or 42
     seed_everything(seed)
     ts = time.gmtime()
@@ -139,6 +140,7 @@ def main(cfg):
                                 group=data_group,
                                 column=infocolumn,
                                 preload=preload,
+                                meta=meta,
                                 transform=train_transform)
 
             ds_val = BrainDataset(data=data_path,
@@ -147,6 +149,7 @@ def main(cfg):
                                 column=infocolumn,
                                 group=data_group,
                                 preload=preload,
+                                meta=meta,
                                 transform=val_transform)
         elif dataset == 'heart':
             ds_train = HeartDataset(data=data_path,
@@ -155,6 +158,7 @@ def main(cfg):
                                     group=data_group,
                                     column=infocolumn,
                                     preload=preload,
+                                    meta=meta,
                                     transform=train_transform)
 
             ds_val = HeartDataset(data=data_path,
@@ -163,6 +167,7 @@ def main(cfg):
                                   column=infocolumn,
                                   group=data_group,
                                   preload=preload,
+                                  meta=meta,
                                   transform=val_transform)
 
         elif dataset == 'fundus':
@@ -172,6 +177,7 @@ def main(cfg):
                                     group=data_group,
                                     column=infocolumn,
                                     preload=preload,
+                                    meta=meta,
                                     transform=train_transform)
 
             ds_val = FundusDataset(data=data_path,
@@ -180,6 +186,7 @@ def main(cfg):
                                   column=infocolumn,
                                   group=data_group,
                                   preload=preload,
+                                  meta=meta,
                                   transform=val_transform)
 
     if dataset == 'fundus':

@@ -20,6 +20,7 @@ class BrainDataset(AbstractDataset):
                  group,
                  column='label',
                  preload=False,
+                 meta=False,
                  ukb=True,
                  transform=None):
 
@@ -29,13 +30,14 @@ class BrainDataset(AbstractDataset):
         self.transform = transform
         self.logger = logging.getLogger(__name__)
         self.preload = preload
+        self.meta = meta
 
         self.logger.info('opening dataset ...')
         self.logger.info(info)
-        #if ukb:
-        #    info_df = pd.read_csv(info, index_col=0, usecols=[1,2,3,4,5], dtype={'key': 'string', column: np.float32})
-        #else:
-        info_df = pd.read_csv(info, index_col=0, dtype={'key': 'string', column: np.float32})
+        if ukb:
+            info_df = pd.read_csv(info, index_col=0, usecols=[1,2,3,4,5], dtype={'key': 'string', column: np.float32})
+        else:
+            info_df = pd.read_csv(info, index_col=0, dtype={'key': 'string', column: np.float32})
         self.keys = [l.strip() for l in Path(keys).open().readlines()] if isinstance(keys, str) else keys
 
         self.logger.info('loading h5 dataset ...')
@@ -44,6 +46,7 @@ class BrainDataset(AbstractDataset):
         def load_data():
             for key in tqdm(self.keys):
                 label = info_df.loc[key][column]
+                sex = info_df.loc[key]['sex']
                 group_str = group + '/' if group else ''
                 try:
                     if ukb:
@@ -65,7 +68,8 @@ class BrainDataset(AbstractDataset):
                         data = fhandle[f'{group_str}{keyh5}']
                 sample = {'data': data,
                           'label': label,
-                          'key': key}
+                          'key': key,
+                          'sex': sex}
                 yield sample
         self.data_container = collections.deque(load_data())
 
@@ -82,6 +86,8 @@ class BrainDataset(AbstractDataset):
         if self.transform:
             sample = self.transform(**sample)
         sample['data'] = np.squeeze(sample['data'], axis=0)
+        if self.meta:
+            sample['position'] = ds['sex']
         return sample
 
 
@@ -93,6 +99,7 @@ class HeartDataset(AbstractDataset):
                  group,
                  column='label',
                  preload=False,
+                 meta=False,
                  ukb=True,
                  transform=None):
 
@@ -102,13 +109,14 @@ class HeartDataset(AbstractDataset):
         self.transform = transform
         self.logger = logging.getLogger(__name__)
         self.preload = preload
+        self.meta = meta
 
         self.logger.info('opening dataset ...')
         self.logger.info(info)
-        #if ukb:
-        #    info_df = pd.read_csv(info, index_col=0, usecols=[1,2,3,4,5], dtype={'key': 'string', column: np.float32})
-        #else:
-        info_df = pd.read_csv(info, index_col=0, dtype={'key': 'string', column: np.float32})
+        if ukb:
+            info_df = pd.read_csv(info, index_col=0, usecols=[1,2,3,4,5], dtype={'key': 'string', column: np.float32})
+        else:
+            info_df = pd.read_csv(info, index_col=0, dtype={'key': 'string', column: np.float32})
         self.keys = [l.strip() for l in Path(keys).open().readlines()] if isinstance(keys, str) else keys
 
         self.logger.info('loading h5 dataset ...')
@@ -118,6 +126,7 @@ class HeartDataset(AbstractDataset):
         def load_data():
             for key in tqdm(self.keys):
                 label = info_df.loc[key][column]
+                sex = info_df.loc[key]['sex']
                 group_str = group + '/' if group else ''
 
                 for idx in [2, 3]:
@@ -135,7 +144,8 @@ class HeartDataset(AbstractDataset):
                 data = np.squeeze(data[:, :, np.random.randint(np.shape(data)[2], size=1), :])  # take a random slice -> data: X x Y x Time
                 sample = {'data': data,
                           'label': label,
-                          'key': key}
+                          'key': key,
+                          'sex': sex}
                 yield sample
         self.data_container = collections.deque(load_data())
 
@@ -152,6 +162,8 @@ class HeartDataset(AbstractDataset):
         if self.transform:
             sample = self.transform(**sample)
         sample['data'] = np.squeeze(sample['data'], axis=0)
+        if self.meta:
+            sample['position'] = ds['sex']
         return sample
 
 

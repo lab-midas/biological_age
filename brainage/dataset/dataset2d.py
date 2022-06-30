@@ -94,6 +94,7 @@ class FundusDataset(AbstractDataset):
                  group,
                  column='label',
                  preload=False,
+                 meta=False,
                  ukb=True,
                  transform=None):
 
@@ -103,12 +104,13 @@ class FundusDataset(AbstractDataset):
         self.transform = transform
         self.logger = logging.getLogger(__name__)
         self.preload = preload
+        self.meta = meta
 
         self.logger.info('opening dataset ...')
-        # if ukb:
-        #    info_df = pd.read_csv(info, index_col=0, usecols=[1,2,3,4,5], dtype={'key': 'string', column: np.float32})
-        # else:
-        info_df = pd.read_csv(info, index_col=0, dtype={'key': 'string', column: np.float32})
+        if ukb:
+            info_df = pd.read_csv(info, index_col=0, usecols=[1,2,3,4,5], dtype={'key': 'string', column: np.float32})
+        else:
+            info_df = pd.read_csv(info, index_col=0, dtype={'key': 'string', column: np.float32})
         self.keys = [l.strip() for l in Path(keys).open().readlines()] if isinstance(keys, str) else keys
 
         fhandle = h5py.File(data, 'r')
@@ -118,6 +120,7 @@ class FundusDataset(AbstractDataset):
                 group_str, key = key.split('/')
                 group_str += '/'
                 label = info_df.loc[key][column]
+                sex = info_df.loc[key]['sex']
 
                 #coin = np.random.randint(2, size=1)
                 #if coin:
@@ -139,7 +142,8 @@ class FundusDataset(AbstractDataset):
 
                 sample = {'data': data,
                           'label': label,
-                          'key': key}
+                          'key': key,
+                          'sex': sex}
                 yield sample
 
         self.data_container = collections.deque(load_data())
@@ -157,4 +161,6 @@ class FundusDataset(AbstractDataset):
         if self.transform:
             sample = self.transform(**sample)
         sample['data'] = np.squeeze(sample['data'], axis=0)
+        if self.meta:
+            sample['position'] = ds['sex']
         return sample
