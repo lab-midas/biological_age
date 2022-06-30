@@ -6,7 +6,7 @@ hydra:
 
 project:
   name: age
-  job: ukb_t1brain_volume
+  job: ukb_t1brain_volume_meta
   seed: 42
 
 trainer:
@@ -30,7 +30,7 @@ model:
   no_max_pool: False
   strides: [1,1,1,2]
   heteroscedastic: True
-  position: False  # input for meta information
+  position: True  # input for meta information
 
 optimizer:
   learning_rate: 1e-4

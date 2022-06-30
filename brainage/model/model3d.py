@@ -19,7 +19,7 @@ from brainage.model.architecture.simple import SimpleCNN
 class AgeModel3DVolume(pl.LightningModule):
 
     def __init__(self,
-                hparams,
+                cfg,
                 train_ds=None,
                 val_ds=None,
                 offline_wandb=False,
@@ -30,23 +30,22 @@ class AgeModel3DVolume(pl.LightningModule):
 
         # copy over
         #self.hparams = hparams
-        cfg = OmegaConf.create(hparams)
-        self.model_depth = cfg.model.depth or 18
-        self.inputs = cfg.model.inputs or 3
-        self.outputs = cfg.model.outputs or 1
-        self.use_position = cfg.model.position or False
-        self.loss_type = cfg.model.loss or 'l2'
-        self.heteroscedastic = cfg.model.heteroscedastic or False
-        self.norm_type = cfg.model.norm or 'IN'
-        self.learning_rate = cfg.optimizer.learning_rate or 1e-4
-        self.weight_decay = cfg.optimizer.weight_decay or 0.0
-        self.batch_size = cfg.loader.batch_size or 8
-        self.num_workers = cfg.loader.num_workers or 4
-        self.use_layer = cfg.model.use_layer or [1,1,1,1]
-        self.strides = cfg.model.strides
+        self.model_depth = cfg['model']['depth'] or 18
+        self.inputs = cfg['model']['inputs'] or 3
+        self.outputs = cfg['model']['outputs'] or 1
+        self.use_position = cfg['model']['position'] or False
+        self.loss_type = cfg['model']['loss'] or 'l2'
+        self.heteroscedastic = cfg['model']['heteroscedastic'] or False
+        self.norm_type = cfg['model']['norm'] or 'IN'
+        self.learning_rate = cfg['optimizer']['learning_rate'] or 1e-4
+        self.weight_decay = cfg['optimizer']['weight_decay'] or 0.0
+        self.batch_size = cfg['loader']['batch_size'] or 8
+        self.num_workers = cfg['loader']['num_workers'] or 4
+        self.use_layer = cfg['model']['use_layer'] or 3
+        self.strides = cfg['model']['strides']
         self.train_ds = train_ds
         self.val_ds = val_ds
-        self.no_max_pool = cfg.model.no_max_pool or False
+        self.no_max_pool = cfg['model']['no_max_pool'] or False
         self.offline_wandb = offline_wandb
         self.log_model = log_model
         self.dataset = dataset
@@ -88,7 +87,7 @@ class AgeModel3DVolume(pl.LightningModule):
                 imgc = img[0, :, :, int(img.size()[2] // 2)].cpu().numpy() * 255.0
             samples.append(wandb.Image(imgc, caption=f'batch {batch_idx} age {label}'))
         if not self.offline_wandb:
-            wandb.log({'samples': samples})
+            self.logger.experiment.log({'samples': samples})
 
     def training_step(self, batch, batch_idx):
         x = batch['data'].float()
