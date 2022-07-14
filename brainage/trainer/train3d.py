@@ -198,12 +198,14 @@ def main():
     
     if not offline_wandb:
         # wandb.init(name=f'{job}-{job_id}', entity='lab-midas', project=project, config=args)
-        wandb_logger = WandbLogger(name=f'{job}-{job_id}', entity='lab-midas', project=project, offline=offline_wandb, log_model=log_model)
+        wandb_logger = [WandbLogger(name=f'{job}-{job_id}', entity='lab-midas', project=project, offline=offline_wandb, log_model=log_model)]
+    else:
+        wandb_logger = False
     
-    trainer = Trainer(logger=[wandb_logger], gpus=cfg['trainer']['gpus'], max_epochs=cfg['trainer']['max_epochs'],
+    trainer = Trainer(logger=wandb_logger, accelerator='gpu', devices=cfg['trainer']['gpus'], max_epochs=cfg['trainer']['max_epochs'],
                         benchmark=cfg['trainer']['benchmark'], val_check_interval=cfg['trainer']['val_check_interval'], strategy="ddp")
 
-    if trainer.global_rank == 0:
+    if trainer.global_rank == 0 and not offline_wandb:
         wandb_logger.experiment.config.update(cfg)
 
     trainer.fit(model)

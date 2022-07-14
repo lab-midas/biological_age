@@ -120,9 +120,10 @@ class HeartDataset(AbstractDataset):
         self.keys = [l.strip() for l in Path(keys).open().readlines()] if isinstance(keys, str) else keys
 
         self.logger.info('loading h5 dataset ...')
-        data = Path(data).with_suffix('')  # multiple h5 files
+        #self.datapath = Path(data).with_suffix('')  # multiple h5 files
+        #self.logger.info(self.datapath)
+        fhandle = h5py.File(data, 'r')
         self.logger.info(data)
-        #fhandle = h5py.File(data, 'r')
         def load_data():
             for key in tqdm(self.keys):
                 label = info_df.loc[key][column]
@@ -131,14 +132,15 @@ class HeartDataset(AbstractDataset):
 
                 for idx in [2, 3]:
                     keyh5 = key + '_' + str(idx)
-                    if Path(data).joinpath(keyh5 + '_sa.h5').exists():
+                    #if Path(self.datapath).joinpath(keyh5 + '_sa.h5').exists():
+                    if f'{group_str}{keyh5}' in fhandle:
                         break
                     else:
                         keyh5 = ''
 
-                fhandle = h5py.File(data.joinpath(keyh5 + '_sa.h5'), 'r')
+                #fhandle = h5py.File(self.datapath.joinpath(keyh5 + '_sa.h5'), 'r')
                 if self.preload:
-                    data = fhandle[f'{group_str}{keyh5}'][:]
+                    data = fhandle[f'{group_str}{keyh5}'][:]  # keyh5_sa for multiple h5 files
                 else:
                     data = fhandle[f'{group_str}{keyh5}']
                 data = np.squeeze(data[:, :, np.random.randint(np.shape(data)[2], size=1), :])  # take a random slice -> data: X x Y x Time

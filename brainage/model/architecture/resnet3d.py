@@ -213,7 +213,7 @@ class ResNet(nn.Module):
 
         # include patch position ?
         self.use_position = use_position
-        add_pos_features = 3 if self.use_position else 0
+        add_pos_features = 1 if self.use_position else 0
         self.fc = nn.Linear(block_inplanes[self.use_layer-1] * block.expansion + add_pos_features, n_classes)
 
         # grad cam
@@ -288,7 +288,7 @@ class ResNet(nn.Module):
         x = x.view(x.size(0), -1)
         # if given, include slice position
         if self.use_position: 
-            x = torch.cat([x, pos.flatten(start_dim=1)], dim=1)
+            x = torch.cat([x, torch.unsqueeze(pos, 1)], dim=1)  # old code: pos.flatten(start_dim=1)
         # fully connected part
         x = self.fc(x)
         return x

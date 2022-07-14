@@ -60,7 +60,7 @@ class AgeModel3DVolume(pl.LightningModule):
                                 use_layer=self.use_layer,
                                 strides=self.strides,
                                 no_max_pool=self.no_max_pool,
-                                use_position=False)
+                                use_position=self.use_position)
 
     def forward(self, x, pos=None, hook=False):
         return self.net(x, pos, hook)
