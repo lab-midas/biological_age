@@ -6,11 +6,11 @@ hydra:
 
 project:
   name: age
-  job: ukb_heart_volume
+  job: ukb_fundus
   seed: 42
 
 trainer:
-  gpus: 1
+  gpus: 4
   max_epochs: 200
   benchmark: True
   deterministic: False  # not possible, since PyTorch did not implement maxpool deterministic backward path!
@@ -22,7 +22,7 @@ trainer:
 
 model:
   norm: IN
-  inputs: 1
+  inputs: 3   # RGB
   outputs: 2
   loss: 'l2'
   depth: 18
@@ -30,33 +30,33 @@ model:
   no_max_pool: False
   strides: [1,1,1,2]
   heteroscedastic: True
-  position: False
+  position: True
 
 optimizer:
-  learning_rate: 1e-4
+  learning_rate: 4e-4
   weight_decay: 0.0
 
 loader:
-  batch_size: 12
-  num_workers: 16
+  batch_size: 8
+  num_workers: 12
 
 dataset:
   mode: volume
-  data: !ENV ${DATA}/UKB/interim/ukb_heart_preprocessed.h5
-  group: image
+  data: !ENV ${DATA}/UKB/interim/ukb_fundus_preprocessed.h5
+  group:
   info: !ENV ${DATA}/UKB/interim/ukb_all.csv
   column: age
   preload: False
   fold: 0
-  train: !ENV ${DATA}/UKB/interim/keys/train_imaging.dat
-  val:   !ENV ${DATA}/UKB/interim/keys/test.dat
+  train: !ENV ${DATA}/UKB/interim/keys/train_fundus.dat
+  val:   !ENV ${DATA}/UKB/interim/keys/test_fundus.dat  # same as test.dat just with additional info if left/right fundus image of patient is available/taken
   debug:
-  #debug: ${env:DATA}/UKB/interim/keys/debug.dat
+  #debug: ${env:DATA}/UKB/interim/keys/debug_fundus.dat
   data_augmentation: True
   crop_size:
   crop_margins:
   #crop_size: [100, 125, 105]
   #crop_margins: [5, 5, 5]
-  gamma_range: [0.7, 1.3]
+  gamma_range: [0.9, 1.1]
   patch_size:
-  mirror_axis:
+  mirror_axis: 1
