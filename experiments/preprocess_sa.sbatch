@@ -3,7 +3,7 @@
 #SBATCH --job-name=ukbpresa
 #SBATCH --partition=week
 #SBATCH --time 7-0
-#SBATCH --nodelist=node-gpu-04
+#SBATCH --nodelist=node-cpu-02
 #SBATCH --error=job.%J.%x.err
 #SBATCH --output=job.%J.%x.out
 

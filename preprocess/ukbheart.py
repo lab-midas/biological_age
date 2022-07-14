@@ -270,7 +270,7 @@ def get_bounding_boxes(save_path):
     # max_loc = max_loc[3:6] + np.array([10, 10, 0])
 
 
-def crop(x, s, c):
+def crop(x, s, c, shift_center=True):
     # x: input data
     # s: desired size
     # c: center
@@ -290,25 +290,48 @@ def crop(x, s, c):
     if np.sum(m == s) == len(m):
         return x
 
+    def get_limits(sin, cin):
+        if np.remainder(sin, 2) == 0:
+            lower = cin + 1 + np.ceil(-sin / 2) - 1
+            upper = cin + np.ceil(sin / 2)
+        else:
+            lower = cin + np.ceil(-sin / 2) - 1
+            upper = cin + np.ceil(sin / 2) - 1
+        return lower, upper
+
     idx = list()
     idx_pad = ()
     for n in range(np.size(s)):
-        if np.remainder(s[n], 2) == 0:
-            lower = c[n] + 1 + np.ceil(-s[n] / 2) - 1
-            upper = c[n] + np.ceil(s[n] / 2)
-        else:
-            lower = c[n] + np.ceil(-s[n] / 2) - 1
-            upper = c[n] + np.ceil(s[n] / 2) - 1
+        #if np.remainder(s[n], 2) == 0:
+        #    lower = c[n] + 1 + np.ceil(-s[n] / 2) - 1
+        #    upper = c[n] + np.ceil(s[n] / 2)
+        #else:
+        #    lower = c[n] + np.ceil(-s[n] / 2) - 1
+        #    upper = c[n] + np.ceil(s[n] / 2) - 1
+        lower, upper = get_limits(s[n], c[n])
 
+        # shift center
+        if shift_center:
+            if lower < 0:
+                c[n] += np.abs(lower)
+
+            if upper > m[n]:
+                c[n] -= np.abs(upper - m[n])
+
+            lower, upper = get_limits(s[n], c[n])
+
+        # if even shifting the center is not helping, pad data
         if lower < 0:
             low_pad = int(np.abs(lower))
             lower = 0
+            upper = s[n]
         else:
             low_pad = 0
 
         if upper > m[n]:
             upper_pad = int(np.abs(upper - m[n]))
             upper = m[n]
+            lower = m[n] - s[n]
         else:
             upper_pad = 0
 
@@ -391,8 +414,9 @@ def convert_nifti_h5(input_dir, output_dir, output_file, save_path, single_file=
         keyh5 = nifti_file.stem.split('.')[0]
         key = keyh5.split('_')[0]
 
-        if not single_file and h5_dir.joinpath(keyh5 + '.h5').exists():
-            return
+        if not single_file and h5_dir.joinpath(keyh5 + '_sa.h5').exists():
+            if h5py.File(h5_dir.joinpath(keyh5 + '_sa.h5'), 'r')['image/' + f'{keyh5}' + '_sa'].shape[0:2] == sel_shape[0:2]:
+                return
 
         img = nib.load(nifti_file)
         img_data = img.get_fdata().astype(np.float32)
@@ -406,6 +430,7 @@ def convert_nifti_h5(input_dir, output_dir, output_file, save_path, single_file=
         center = list(np.floor(np.asarray(box[0:3], dtype='int') + np.asarray(box[3:6], dtype='int') / 2)) + [
             np.floor(np.shape(img_data)[3] / 2)]
         center = [int(x) for x in center]
+
         # list(box[0:2] + np.floor(np.asarry(sel_shape[0:2]) / 2)) + list(np.floor(np.asarry(box[5] + box[2])/2)) +
 
         # crop image around segmentation mask
@@ -446,6 +471,70 @@ def convert_nifti_h5(input_dir, output_dir, output_file, save_path, single_file=
 
         print(f'elapsed time: {time.strftime("%H:%M:%S", time.gmtime(elapsed_time))}')
 
+def merge_hdf5(input_dir, output_dir, output_file):
+    pats = os.listdir(input_dir)
+    hdf5file = h5py.File(Path(output_dir).joinpath(output_file), 'w')
+    #grp_image = hdf5file.create_group('image')
+
+    for pat in pats:
+        keyh5 = "_".join(pat.split('_')[0:2])
+        hdf5file["/image/" + keyh5] = h5py.ExternalLink(Path(input_dir).joinpath(pat), "/image/" + keyh5 + '_sa')
+    hdf5file.close()
+
+def parse_hdf5(input_dir, output_dir, output_file, info='/mnt/qdata/share/rakuest1/data/UKB/interim/ukb_all.csv',
+               train_set='/mnt/qdata/share/rakuest1/data/UKB/interim/keys/train_imaging.dat',
+               val_set='/mnt/qdata/share/rakuest1/data/UKB/interim/keys/test.dat',
+               group='image'):
+    hdf5file = h5py.File(Path(output_dir).joinpath(output_file), 'r')
+    #info_df = pd.read_csv(info, index_col=0, usecols=[1, 2, 3, 4, 5], dtype={'key': 'string', column: np.float32})
+    train_keys = [l.strip() for l in Path(train_set).open().readlines()]
+    val_keys = [l.strip() for l in Path(val_set).open().readlines()]
+    all_keys = train_keys + val_keys
+    datlist = get_shapes(hdf5file, input_dir, all_keys, group)
+    #d = {'keys': key_proc, 'h5size': shapes_h5, 'niisize': shapes_nii}
+    df = pd.DataFrame(datlist)
+    df.to_csv(output_dir.joinpath('ukb_heart_sizes.csv'))
+    print('Done with shapes')
+
+def get_shapes(hdf5file, input_dir, keys, group):
+    keys = [l.strip() for l in Path(keys).open().readlines()] if isinstance(keys, str) else keys
+    #shapes_h5 = list()
+    #shapes_nii = list()
+    #key_proc = list()
+    datlist = list()
+    #for key in tqdm(keys):
+    def get_shape_inner(key):
+        group_str = group + '/' if group else ''
+
+        for idx in [2, 3]:
+            keyh5 = key + '_' + str(idx)
+            # if Path(self.datapath).joinpath(keyh5 + '_sa.h5').exists():
+            if f'{group_str}{keyh5}' in hdf5file:
+                break
+            else:
+                keyh5 = ''
+
+        shape_h5 = hdf5file[f'{group_str}{keyh5}'].shape
+        #shapes_h5.append(np.shape(data))
+        shape_nii = nib.load(input_dir.joinpath(keyh5 + '_sa.nii.gz')).shape
+        #shapes_nii.append(img.shape)
+        #key_proc.append(keyh5)
+        sample = {'keys': keyh5, 'h5size': shape_h5, 'niisize': shape_nii}
+        datlist.append(sample)
+        return sample
+        #return np.shape(data), img.shape
+
+    num_cores = 1
+    print(f'using {num_cores} CPU cores')
+
+    t = time.time()
+    _ = Parallel(n_jobs=num_cores, backend='threading')(
+        delayed(get_shape_inner)(f) for f in tqdm(keys))
+    elapsed_time = time.time() - t
+
+    print(f'elapsed time: {time.strftime("%H:%M:%S", time.gmtime(elapsed_time))}')
+    return datlist
+
 def main():
     parser = argparse.ArgumentParser(description='Preprocessing pipeline for UK Biobank SA Heart MRI data.\n' \
                                                  'CSV creation\n' \
@@ -472,8 +561,9 @@ def main():
     #nifti_files = [f for f in Path(input_dir).glob('*.nii.gz')]
     #segment_heart(nifti_files, save_path=save_path)
     #get_bounding_boxes(save_path)
-    convert_nifti_h5(input_dir, output_dir, args.output_file, save_path, single_file=False, verbose=False)
-
+    #convert_nifti_h5(input_dir, output_dir, args.output_file, save_path, single_file=False, verbose=False)
+    #merge_hdf5(input_dir, output_dir, args.output_file)
+    parse_hdf5(input_dir, output_dir, args.output_file)
 
 if __name__ == '__main__':
     main()
