@@ -6,7 +6,7 @@ hydra:
 
 project:
   name: age
-  job: ukb_spleen_volume
+  job: ukb_heart_volume_meta
   seed: 42
 
 trainer:
@@ -22,7 +22,7 @@ trainer:
 
 model:
   norm: IN
-  inputs: 4
+  inputs: 1
   outputs: 2
   loss: 'l2'
   depth: 18
@@ -30,28 +30,28 @@ model:
   no_max_pool: False
   strides: [1,1,1,2]
   heteroscedastic: True
-  position: False
+  position: True
 
 optimizer:
   learning_rate: 1e-4
   weight_decay: 0.0
 
 loader:
-  batch_size: 16
-  num_workers: 24
+  batch_size: 12
+  num_workers: 16
 
 dataset:
   mode: volume
-  data: !ENV ${DATA}/UKB/interim/ukb_spl_preprocessed.h5
-  group:
+  data: !ENV ${DATA}/UKB/interim/ukb_heart_preprocessed.h5
+  group: image
   info: !ENV ${DATA}/UKB/interim/ukb_all.csv
   column: age
-  preload: True
+  preload: False
   fold: 0
-  train: !ENV ${DATA}/UKB/interim/keys/train_imaging_abdomen.dat
-  val:   !ENV ${DATA}/UKB/interim/keys/test_abdomen.dat
+  train: !ENV ${DATA}/UKB/interim/keys/train_imaging.dat
+  val:   !ENV ${DATA}/UKB/interim/keys/test.dat
   debug:
-  #debug: !ENV ${DATA}/UKB/interim/keys/debug.dat
+  #debug: ${env:DATA}/UKB/interim/keys/debug.dat
   data_augmentation: True
   crop_size:
   crop_margins:
@@ -59,4 +59,4 @@ dataset:
   #crop_margins: [5, 5, 5]
   gamma_range: [0.7, 1.3]
   patch_size:
-  mirror_axis: 1
+  mirror_axis:

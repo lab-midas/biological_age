@@ -119,7 +119,7 @@ def train_args():
     parser.add_argument("--max_epochs", default=200, type=int, help="Number of epochs")
     parser.add_argument("--benchmark", default=True, type=bool, help="Benchmark")
     parser.add_argument("--val_check_interval", default=1.0, type=float, help="Val Check Intervall")
-
+    parser.add_argument("--predict", default=None, type=str, help="Prediction log for checkpoints (if provided prediction is run)")
 
     parser.add_argument("--modelName", default='resnet18', type=str, help="Model Name")
     parser.add_argument("--depth", default=18, type=int, help="Model Depth")
@@ -166,7 +166,7 @@ def train_args():
         if arg in config:
             print(f'Overriding {arg} from argparse')
         config[arg] = getattr(args, arg)
-    return config
+    return config, args
 
 
 

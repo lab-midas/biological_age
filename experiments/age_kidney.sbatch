@@ -1,8 +1,8 @@
 #!/bin/bash
 ####
-#SBATCH --job-name=ukbageheart
+#SBATCH --job-name=ukbagekidney
 #SBATCH --partition=month
-#SBATCH --gpus=2
+#SBATCH --gpus=1
 #SBATCH --time 31-0
 #SBATCH --cpus-per-task=16
 #SBATCH --signal=SIGUSR1@90
@@ -16,7 +16,7 @@ export OUT=/mnt/qdata/share/rakuest1/results/UKB
 export PATH=/opt/conda/rakuest1/envs/nakoukb/bin:/opt/miniconda3/condabin:$PATH
 
 module load cuda/11.3
-export CONFIG=$PRJ/config/volume/config_ukb_heart.yaml
+export CONFIG=$PRJ/config/volume/config_ukb_kidney.yaml
 cd $PRJ
 export PYTHONPATH=$PRJ
 # MIDASGPUWorker env: optox, denbi: nakoukb

@@ -118,6 +118,7 @@ class FundusDataset(AbstractDataset):
         def load_data():
             for key in tqdm(self.keys):
                 group_str, key = key.split('/')
+                orientation = group_str
                 group_str += '/'
                 label = info_df.loc[key][column]
                 sex = info_df.loc[key]['sex']
@@ -143,7 +144,8 @@ class FundusDataset(AbstractDataset):
                 sample = {'data': data,
                           'label': label,
                           'key': key,
-                          'sex': sex}
+                          'sex': sex,
+                          'orientation': orientation}
                 yield sample
 
         self.data_container = collections.deque(load_data())
@@ -155,7 +157,8 @@ class FundusDataset(AbstractDataset):
         ds = self.data_container[i]
         sample = {'data': np.transpose(ds['data'][:][np.newaxis, ...].astype(np.float32), (0, -1, 1, 2)),
                   'label': ds['label'],
-                  'key': ds['key']}
+                  'key': ds['key'],
+                  'orientation': ds['orientation']}
         # data augmentation
         # data tensor format B x C X H X W (B=1, C=3)
         if self.transform:

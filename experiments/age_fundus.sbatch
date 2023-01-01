@@ -15,7 +15,7 @@ export OUT=/mnt/qdata/share/rakuest1/results/UKB
 export PATH=/opt/conda/rakuest1/envs/nakoukb/bin:/opt/miniconda3/condabin:$PATH
 
 module load cuda/11.3
-export CONFIG=$PRJ/config/volume/config_ukb_fundus.yaml
+export CONFIG=$PRJ/config/volume/config_ukb_fundus_meta.yaml
 cd $PRJ
 export PYTHONPATH=$PRJ
 # MIDASGPUWorker env: optox, denbi: nakoukb

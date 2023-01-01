@@ -274,6 +274,7 @@ def crop(x, s, c, shift_center=True):
     # x: input data
     # s: desired size
     # c: center
+    # shift_center: shift the center of cropping so that the whole patch is inside the image (True), or symmetric-pad in case that patches extend beyond image borders (False)
     if type(s) is not np.ndarray:
         s = np.asarray(s, dtype='f')
 
@@ -370,12 +371,16 @@ def write_keys(input_dir, output_dir, output_file, verbose=False):
     return keys
 
 
-def convert_nifti_h5(input_dir, output_dir, output_file, save_path, single_file=True, verbose=False):
+def convert_nifti_h5(input_dir, output_dir, output_file, save_path, single_file=True, df_redo=None, verbose=False):
     # Create output directory if it does not exist
     output_dir.mkdir(exist_ok=True)
 
     # Get list of all nifti files in input_dir
     nifti_files = [f for f in input_dir.glob('*.nii.gz')]
+
+    if df_redo is not None:
+        nifti_files = [f for f in nifti_files if '_'.join(f.stem.split('.')[0].split('_')[0:2]) in df_redo['keys'].tolist()]
+        print('Redoing {} nifti files'.format(len(nifti_files)))
 
     # Create list of all h5 files in output_dir
     if single_file:
@@ -427,7 +432,7 @@ def convert_nifti_h5(input_dir, output_dir, output_file, save_path, single_file=
             print('Patient mask extraction failed: ' + keyh5)
             return
         box = bounding_boxes_ED[pat_list.index('_'.join(keyh5.split('_')[0:2]))]
-        center = list(np.floor(np.asarray(box[0:3], dtype='int') + np.asarray(box[3:6], dtype='int') / 2)) + [
+        center = list(np.floor((np.asarray(box[0:3], dtype='int') + np.asarray(box[3:6], dtype='int')) / 2)) + [
             np.floor(np.shape(img_data)[3] / 2)]
         center = [int(x) for x in center]
 
@@ -444,6 +449,8 @@ def convert_nifti_h5(input_dir, output_dir, output_file, save_path, single_file=
             grp_image.create_dataset(keyh5, data=img_crop)
             grp_affine.create_dataset(keyh5, data=affine)
         else:
+            if h5_dir.joinpath(keyh5 + '_sa.h5').exists():
+                Path(h5_dir.joinpath(keyh5 + '_sa.h5')).unlink()
             h5file = h5py.File(h5_dir.joinpath(keyh5 + '.h5'), 'w')
             grps_image = h5file.create_group('image')
             grps_affine = h5file.create_group('affine')
@@ -461,7 +468,7 @@ def convert_nifti_h5(input_dir, output_dir, output_file, save_path, single_file=
         for nifti_file in tqdm(nifti_files):
             process_file(nifti_file)
     else:
-        num_cores = 16
+        num_cores = 8
         print(f'using {num_cores} CPU cores')
 
         t = time.time()
@@ -520,7 +527,7 @@ def get_shapes(hdf5file, input_dir, keys, group):
         #shapes_nii.append(img.shape)
         #key_proc.append(keyh5)
         sample = {'keys': keyh5, 'h5size': shape_h5, 'niisize': shape_nii}
-        datlist.append(sample)
+        #datlist.append(sample)
         return sample
         #return np.shape(data), img.shape
 
@@ -528,8 +535,11 @@ def get_shapes(hdf5file, input_dir, keys, group):
     print(f'using {num_cores} CPU cores')
 
     t = time.time()
-    _ = Parallel(n_jobs=num_cores, backend='threading')(
-        delayed(get_shape_inner)(f) for f in tqdm(keys))
+    #_ = Parallel(n_jobs=num_cores, backend='threading')(
+    #    delayed(get_shape_inner)(f) for f in tqdm(keys))
+    for f in tqdm(keys):
+        sample = get_shape_inner(f)
+        datlist.append(sample)
     elapsed_time = time.time() - t
 
     print(f'elapsed time: {time.strftime("%H:%M:%S", time.gmtime(elapsed_time))}')
@@ -563,7 +573,14 @@ def main():
     #get_bounding_boxes(save_path)
     #convert_nifti_h5(input_dir, output_dir, args.output_file, save_path, single_file=False, verbose=False)
     #merge_hdf5(input_dir, output_dir, args.output_file)
-    parse_hdf5(input_dir, output_dir, args.output_file)
+    #parse_hdf5(input_dir, output_dir, args.output_file)
+    df = pd.read_csv('/mnt/qdata/share/rakuest1/data/UKB/interim/ukb_heart_sizes.csv')
+    df_redo = df.copy()
+    df_redo = df_redo.loc[df_redo['h5size'] != '(72, 76, 8, 50)']
+    #df_redo['h5size'] = df_redo['h5size'].apply(lambda x: np.fromstring(x.replace('(', '').replace(')', ''), dtype=int, sep=","))
+    #df_redo['idx'] = df_redo['h5size'].apply(lambda x: np.all(x != np.asarray([72, 76, 8, 50])))
+    #df_redo = df_redo.loc[df_redo['idx'] == True]
+    convert_nifti_h5(input_dir, output_dir, args.output_file, save_path, single_file=False, df_redo=None, verbose=False)
 
 if __name__ == '__main__':
     main()

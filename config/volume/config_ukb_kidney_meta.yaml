@@ -6,7 +6,7 @@ hydra:
 
 project:
   name: age
-  job: ukb_spleen_volume
+  job: ukb_kidney_volume_meta
   seed: 42
 
 trainer:
@@ -30,26 +30,26 @@ model:
   no_max_pool: False
   strides: [1,1,1,2]
   heteroscedastic: True
-  position: False
+  position: True
 
 optimizer:
   learning_rate: 1e-4
   weight_decay: 0.0
 
 loader:
-  batch_size: 16
-  num_workers: 24
+  batch_size: 8
+  num_workers: 16
 
 dataset:
   mode: volume
-  data: !ENV ${DATA}/UKB/interim/ukb_spl_preprocessed.h5
+  data: !ENV ${DATA}/UKB/interim/ukb_kidney_preprocessed.h5
   group:
   info: !ENV ${DATA}/UKB/interim/ukb_all.csv
   column: age
   preload: True
   fold: 0
-  train: !ENV ${DATA}/UKB/interim/keys/train_imaging_abdomen.dat
-  val:   !ENV ${DATA}/UKB/interim/keys/test_abdomen.dat
+  train: !ENV ${DATA}/UKB/interim/keys/train_imaging_kidney.dat  # containing keys with: key_left & key_right (left and right kidney)
+  val:   !ENV ${DATA}/UKB/interim/keys/test_kidney.dat
   debug:
   #debug: !ENV ${DATA}/UKB/interim/keys/debug.dat
   data_augmentation: True

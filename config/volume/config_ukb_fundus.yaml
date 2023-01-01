@@ -51,7 +51,7 @@ dataset:
   train: !ENV ${DATA}/UKB/interim/keys/train_fundus.dat
   val:   !ENV ${DATA}/UKB/interim/keys/test_fundus.dat  # same as test.dat just with additional info if left/right fundus image of patient is available/taken
   debug:
-  #debug: ${env:DATA}/UKB/interim/keys/debug_fundus.dat
+  #debug: !ENV ${DATA}/UKB/interim/keys/debug_fundus.dat
   data_augmentation: True
   crop_size:
   crop_margins:

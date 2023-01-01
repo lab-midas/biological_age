@@ -3,6 +3,8 @@
 #SBATCH --job-name=ukbpresa
 #SBATCH --partition=week
 #SBATCH --time 7-0
+#SBATCH --cpus-per-task=8
+#SBATCH --mem-per-cpu=6000
 #SBATCH --nodelist=node-cpu-02
 #SBATCH --error=job.%J.%x.err
 #SBATCH --output=job.%J.%x.out

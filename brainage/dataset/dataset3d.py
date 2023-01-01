@@ -69,7 +69,8 @@ class BrainDataset(AbstractDataset):
                 sample = {'data': data,
                           'label': label,
                           'key': key,
-                          'sex': sex}
+                          'sex': sex,
+                          'orientation': None}
                 yield sample
         self.data_container = collections.deque(load_data())
 
@@ -80,7 +81,8 @@ class BrainDataset(AbstractDataset):
         ds = self.data_container[i]
         sample = {'data':   ds['data'][:][np.newaxis, np.newaxis, ...].astype(np.float32),
                   'label':  ds['label'],
-                  'key':    ds['key']}
+                  'key':    ds['key'],
+                  'orientation': ds['orientation']}
         # data augmentation
         # data tensor format B x C X H X W X D (B=C=1)
         if self.transform:
@@ -147,7 +149,8 @@ class HeartDataset(AbstractDataset):
                 sample = {'data': data,
                           'label': label,
                           'key': key,
-                          'sex': sex}
+                          'sex': sex,
+                          'orientation': None}
                 yield sample
         self.data_container = collections.deque(load_data())
 
@@ -158,9 +161,110 @@ class HeartDataset(AbstractDataset):
         ds = self.data_container[i]
         sample = {'data':   ds['data'][:][np.newaxis, np.newaxis, ...].astype(np.float32),
                   'label':  ds['label'],
-                  'key':    ds['key']}
+                  'key':    ds['key'],
+                  'orientation': ds['orientation']}
         # data augmentation
         # data tensor format B x C X H X W X D (B=C=1)
+        if self.transform:
+            sample = self.transform(**sample)
+        sample['data'] = np.squeeze(sample['data'], axis=0)
+        if self.meta:
+            sample['position'] = ds['sex']
+        return sample
+
+
+class AbdomenDataset(AbstractDataset):
+    def __init__(self,
+                 data,
+                 keys,
+                 info,
+                 group,
+                 column='label',
+                 preload=False,
+                 meta=False,
+                 ukb=True,
+                 transform=None):
+
+        super().__init__()
+
+        # copy over
+        self.transform = transform
+        self.logger = logging.getLogger(__name__)
+        self.preload = preload
+        self.meta = meta
+
+        self.logger.info('opening dataset ...')
+        self.logger.info(info)
+        if ukb:
+            info_df = pd.read_csv(info, index_col=0, usecols=[1,2,3,4,5], dtype={'key': 'string', column: np.float32})
+        else:
+            info_df = pd.read_csv(info, index_col=0, dtype={'key': 'string', column: np.float32})
+        self.keys = [l.strip() for l in Path(keys).open().readlines()] if isinstance(keys, str) else keys
+
+        self.contrasts = ['fat', 'inp', 'opp', 'wat']
+        self.logger.info('loading h5 dataset ...')
+        #self.datapath = Path(data).with_suffix('')  # multiple h5 files
+        #self.logger.info(self.datapath)
+        self.filehandle = data
+        if self.preload:
+            fhandle = h5py.File(data, 'r')
+        self.logger.info(data)
+        def load_data():
+            for key in tqdm(self.keys):
+                if '/' in key:  # combined kidney set
+                    keyh5 = key
+                    key = key.split('/')[0]
+                    orientation = keyh5.split('/')[1]
+                else:
+                    keyh5 = key
+                    orientation = None
+                label = info_df.loc[key][column]
+                sex = info_df.loc[key]['sex']
+                group_str = group + '/' if group else ''
+
+                #for idx in [2, 3]:
+                #    keyh5 = key + '_' + str(idx)
+                #    #if Path(self.datapath).joinpath(keyh5 + '_sa.h5').exists():
+                #    if f'{group_str}{keyh5}' in fhandle:
+                #        break
+                #    else:
+                #        keyh5 = ''
+
+                #fhandle = h5py.File(self.datapath.joinpath(keyh5 + '_sa.h5'), 'r')
+                data = []
+                for contrast in self.contrasts:
+                    group_str_inner = group_str + contrast + '/'
+                    if self.preload:
+                        data.append(fhandle[f'{group_str_inner}{keyh5}'][:])
+                    else:
+                        data.append(f'{group_str_inner}{keyh5}')  # not pickable due to multiprocessing, move actual HDF5 file access to get_item
+                #data = np.concatenate(data, axis=0)  # data: C x X x Y x Z
+                sample = {'data': data,
+                          'label': label,
+                          'key': key,
+                          'sex': sex,
+                          'orientation': orientation}
+                yield sample
+        self.data_container = collections.deque(load_data())
+
+    def __len__(self):
+        return len(self.data_container)
+
+    def __getitem__(self, i):
+        ds = self.data_container[i]
+        if self.preload:
+            datasample = np.stack(ds['data'], axis=0)[np.newaxis, ...].astype(np.float32)
+        else:
+            datasample = []
+            for contrast in self.contrasts:
+                datasample.append(h5py.File(self.filehandle, 'r')[ds['data'][self.contrasts.index(contrast)]])
+            datasample = np.stack(datasample, axis=0)[np.newaxis, ...].astype(np.float32)
+        sample = {'data':   datasample,
+                  'label':  ds['label'],
+                  'key':    ds['key'],
+                  'orientation': ds['orientation']}
+        # data augmentation
+        # data tensor format B x C X H X W X D (B=1, C=4)
         if self.transform:
             sample = self.transform(**sample)
         sample['data'] = np.squeeze(sample['data'], axis=0)

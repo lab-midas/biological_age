@@ -6,7 +6,7 @@ hydra:
 
 project:
   name: age
-  job: ukb_spleen_volume
+  job: ukb_kidney_right_volume
   seed: 42
 
 trainer:
@@ -42,7 +42,7 @@ loader:
 
 dataset:
   mode: volume
-  data: !ENV ${DATA}/UKB/interim/ukb_spl_preprocessed.h5
+  data: !ENV ${DATA}/UKB/interim/ukb_rkd_preprocessed.h5
   group:
   info: !ENV ${DATA}/UKB/interim/ukb_all.csv
   column: age

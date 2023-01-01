@@ -92,7 +92,7 @@ def sort_dcm_dir(dicom_dir):
     contrasts = ['fat', 'water', 'in', 'opp']
 
     for contrast in contrasts:
-        dicom_dir.parent.joinpath(contrast).mkdir()
+        dicom_dir.joinpath(contrast).mkdir()
 
     # get echo times
     echo_times = set(())
@@ -104,16 +104,17 @@ def sort_dcm_dir(dicom_dir):
     for f in dicom_files:
         dicomfile = dicom.read_file(f)
         # print(str(file))
+        print(dicomfile[0x00511019].value)
         if 'DIXF' in dicomfile[0x00511019].value:  # fat
-            shutil.copy(f, str(dicom_dir.parent.joinpath(contrasts[0])))
+            shutil.copy(f, str(dicom_dir.joinpath(contrasts[0])))
         elif 'DIXW' in dicomfile[0x00511019].value:  # water
-            shutil.copy(f, str(dicom_dir.parent.joinpath(contrasts[1])))
+            shutil.copy(f, str(dicom_dir.joinpath(contrasts[1])))
         elif dicomfile.EchoTime == max(echo_times):  # in
-            shutil.copy(f, str(dicom_dir.parent.joinpath(contrasts[2])))
+            shutil.copy(f, str(dicom_dir.joinpath(contrasts[2])))
         else:  # op
-            shutil.copy(f, str(dicom_dir.parent.joinpath(contrasts[3])))
+            shutil.copy(f, str(dicom_dir.joinpath(contrasts[3])))
 
-    shutil.rmtree(dicom_dir)
+    #shutil.rmtree(dicom_dir)
 
 def get_tags_in_files(dicom_path, only_first=True, tag_file_path=''):
     """

@@ -1,8 +1,8 @@
 hydra:
   run:
-    dir: ${env:OUT}/${project.name}/${project.job}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: !ENV ${OUT}/${project.name}/${project.job}/${now:%Y-%m-%d}/${now:%H-%M-%S}
   sweep:
-    dir: ${env:OUT}/${project.name}/${project.job}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: !ENV ${OUT}/${project.name}/${project.job}/${now:%Y-%m-%d}/${now:%H-%M-%S}
 
 project:
   name: age
@@ -22,7 +22,7 @@ trainer:
 
 model:
   norm: IN
-  inputs: 1
+  inputs: 4
   outputs: 2
   loss: 'l2'
   depth: 18
@@ -37,21 +37,21 @@ optimizer:
   weight_decay: 0.0
 
 loader:
-  batch_size: 16
-  num_workers: 4
+  batch_size: 8
+  num_workers: 16
 
 dataset:
   mode: volume
-  data: ${env:DATA}/UKB/interim/ukb_kidney_preprocessed.h5
-  group: image
-  info: ${env:DATA}/UKB/interim/ukb_all.csv
+  data: !ENV ${DATA}/UKB/interim/ukb_kidney_preprocessed.h5
+  group:
+  info: !ENV ${DATA}/UKB/interim/ukb_all.csv
   column: age
-  preload: False
+  preload: True
   fold: 0
-  train: ${env:DATA}/UKB/interim/keys/train_imaging.dat
-  val:   ${env:DATA}/UKB/interim/keys/test.dat
+  train: !ENV ${DATA}/UKB/interim/keys/train_imaging_kidney.dat  # containing keys with: key_left & key_right (left and right kidney)
+  val:   !ENV ${DATA}/UKB/interim/keys/test_kidney.dat
   debug:
-  #debug: ${env:DATA}/UKB/interim/keys/debug.dat
+  #debug: !ENV ${DATA}/UKB/interim/keys/debug_kidney.dat
   data_augmentation: True
   crop_size:
   crop_margins:

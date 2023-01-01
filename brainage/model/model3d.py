@@ -49,6 +49,7 @@ class AgeModel3DVolume(pl.LightningModule):
         self.offline_wandb = offline_wandb
         self.log_model = log_model
         self.dataset = dataset
+        self.result_df = {'key': [], 'sex': [], 'age': [], 'pred': [], 'sigma': [], 'orientation': []}
 
         if self.loss_type == 'l2':
             self.loss_criterion = l2_loss(heteroscedastic=self.heteroscedastic)
@@ -83,6 +84,8 @@ class AgeModel3DVolume(pl.LightningModule):
         for img, label in zip(batch['data'], batch['label']):
             if self.dataset == 'brain':
                 imgc = img[0, :, img.size()[1]//2, :].cpu().numpy() * 255.0
+            elif self.dataset == 'abdominal':
+                imgc = img[0, :, :, int(img.size()[2] // 2)].cpu().numpy()
             else:
                 imgc = img[0, :, :, int(img.size()[2] // 2)].cpu().numpy() * 255.0
             samples.append(wandb.Image(imgc, caption=f'batch {batch_idx} age {label}'))
@@ -125,6 +128,28 @@ class AgeModel3DVolume(pl.LightningModule):
         logs = {'val_loss': avg_loss, 'mae': avg_mae, 'mse': avg_mse}
         return {'val_loss': avg_loss, 'log': logs, 'progress_bar': logs}
 
+    def predict_step(self, batch, batch_idx):
+        x = batch['data'].float()
+        y = batch['label'].float()
+        pos = batch['position'].float() if self.use_position else None
+        y_hat = self(x, pos=pos).detach().cpu().numpy()
+        pred = [y_hat[i, 0] for i in range(y_hat.shape[0])]
+        sigma = [y_hat[i, 1] for i in range(y_hat.shape[0])]
+        pos = [pos[i].detach().cpu().numpy() for i in range(len(pos))] if self.use_position else [None]*len(x)
+        self.result_df['key'].extend(batch['key'])
+        self.result_df['age'].extend(y.detach().cpu().numpy())
+        self.result_df['pred'].extend(pred)
+        self.result_df['sigma'].extend(sigma)
+        self.result_df['sex'].extend(pos)
+        self.result_df['orientation'].extend(batch['orientation'])
+
+    def write_results(self, path):
+        result_df = pd.DataFrame(self.result_df)
+        result_df.to_csv(path, index=False)
+
+    def reset_results(self):
+        self.result_df = {'key': [], 'sex': [], 'age': [], 'pred': [], 'sigma': [], 'orientation': []}
+
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
 
@@ -136,4 +161,8 @@ class AgeModel3DVolume(pl.LightningModule):
     def val_dataloader(self):
         dataset = self.val_ds
         loader = DataLoader(dataset, batch_size=self.batch_size, num_workers=self.num_workers, drop_last=True, shuffle=False, pin_memory=True)
+        return loader
+
+    def dataloader(self, dataset):
+        loader = DataLoader(dataset, batch_size=1, num_workers=self.num_workers, drop_last=False, shuffle=False, pin_memory=True)
         return loader
