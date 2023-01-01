@@ -31,10 +31,20 @@ def main(result_path='/mnt/qdata/share/rakuest1/data/UKB/interim/results'):
     cols = ['key', 'sex_brain_meta', 'age'] #, 'pred_brain', 'pred_brain_meta', 'pred_fundus', 'pred_fundus_meta', 'pred_heart', 'pred_heart_meta', 'pred_liver', 'pred_liver_meta', 'pred_kidney', 'pred_kidney_meta', 'pred_pancreas', 'pred_pancreas_meta', 'pred_spleen', 'pred_spleen_meta']
     suffixes = []
     for job in jobs:
-        cols.append('pred_' + job)
-        cols.append('sigma_' + job)
-        cols.append('pred_' + job + '_meta')
-        cols.append('sigma_' + job + '_meta')
+        if job in ['fundus', 'kidney']:
+            cols.append('pred_left_' + job)
+            cols.append('sigma_left_' + job)
+            cols.append('pred_left_' + job + '_meta')
+            cols.append('sigma_left_' + job + '_meta')
+            cols.append('pred_right_' + job)
+            cols.append('sigma_right_' + job)
+            cols.append('pred_right_' + job + '_meta')
+            cols.append('sigma_right_' + job + '_meta')
+        else:
+            cols.append('pred_' + job)
+            cols.append('sigma_' + job)
+            cols.append('pred_' + job + '_meta')
+            cols.append('sigma_' + job + '_meta')
         suffixes.append(job)
         suffixes.append(job + '_meta')
     dfs = []
@@ -63,5 +73,5 @@ def sort(in_path='/mnt/qdata/share/rakuest1/data/UKB/interim/results_bak', out_p
             df.to_csv(os.path.join(out_path, file + group + '.csv'), index=False)
 
 if __name__ == '__main__':
-    sort()
-    #main()
+    #sort()
+    main()
