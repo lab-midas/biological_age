@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 
-def merge_dfs(dfs, on=None, how='inner', suffixes=None):
+def merge_dfs(dfs, on=None, how='inner', suffixes=None, howfundus=False):
     """Merge multiple dataframes into one.
 
     Args:
@@ -14,11 +14,16 @@ def merge_dfs(dfs, on=None, how='inner', suffixes=None):
     """
     df = dfs[0].sort_values(by=on)
     for i in range(1, len(dfs)):
+        if howfundus:
+            howc = 'outer' if 'fundus' in suffixes[i] else how
+        else:
+            howc = how
+        # df = df.merge(dfs[i].sort_values(by=on), on=on, how=howc, suffixes=suffixes)
         if 'fundus' in suffixes[i] or 'kidney' in suffixes[i]:
             for group in ['left', 'right']:
-                df = df.merge(dfs[i][dfs[i]['orientation'].str.contains(group)], on=on, how=how, suffixes=('', '_' + group + '_' + suffixes[i]))
+                df = df.merge(dfs[i][dfs[i]['orientation'].str.contains(group)], on=on, how=howc, suffixes=('', '_' + group + '_' + suffixes[i]))
         else:
-            df = df.merge(dfs[i], on=on, how=how, suffixes=('', '_' + suffixes[i]))
+            df = df.merge(dfs[i], on=on, how=howc, suffixes=('', '_' + suffixes[i]))
     df.rename(columns={'pred': 'pred_' + suffixes[0], 'sigma': 'sigma_' + suffixes[0], 'sex': 'sex_' + suffixes[0]},
               inplace=True)
     return df
@@ -53,11 +58,23 @@ def main(result_path='/mnt/qdata/share/rakuest1/data/UKB/interim/results'):
         dftrain = pd.read_csv(os.path.join(result_path, file + '_train.csv'))
         dfs.append(pd.concat([dfval, dftrain]))
 
-    # merge data
+    # merge data (inner join), overlap between MRI and fundus
     df = merge_dfs(dfs, on=['key'], how='inner', suffixes=suffixes)
     df = df[cols]
     df.rename(columns={'sex_brain_meta': 'sex'}, inplace=True)
+    df.to_csv(os.path.join(result_path, 'ukb_all_results_only_overlap.csv'), index=False)
+
+    # merge data (outer join), all data of MRI and fundus
+    df = merge_dfs(dfs, on=['key'], how='outer', suffixes=suffixes)
+    df = df[cols]
+    df.rename(columns={'sex_brain_meta': 'sex'}, inplace=True)
     df.to_csv(os.path.join(result_path, 'ukb_all_results.csv'), index=False)
+
+    # merge data (outer join only for fundus), all MRI data + overlap with fundus
+    df = merge_dfs(dfs, on=['key'], how='inner', suffixes=suffixes, howfundus=True)
+    df = df[cols]
+    df.rename(columns={'sex_brain_meta': 'sex'}, inplace=True)
+    df.to_csv(os.path.join(result_path, 'ukb_all_results_mri.csv'), index=False)
 
 def sort(in_path='/mnt/qdata/share/rakuest1/data/UKB/interim/results_bak', out_path='/mnt/qdata/share/rakuest1/data/UKB/interim/results'):
     files = ['ukb_t1brain_volume', 'ukb_t1brain_volume_meta',
