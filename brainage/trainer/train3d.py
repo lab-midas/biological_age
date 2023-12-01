@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 
 import torch
-import hydra
+# import hydra
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -20,6 +20,8 @@ from batchgenerators.transforms.color_transforms import GammaTransform
 from batchgenerators.transforms.spatial_transforms import MirrorTransform
 from batchgenerators.transforms.crop_and_pad_transforms import CenterCropTransform, RandomCropTransform
 from batchgenerators.transforms.abstract_transforms import Compose
+
+sys.path.append('/home/raecker1/nako_ukb_age')
 
 from brainage.model.model3d import AgeModel3DVolume
 from brainage.model.model2d import AgeModel2DChannels
@@ -226,7 +228,7 @@ def main():
     
     if not offline_wandb:
         # wandb.init(name=f'{job}-{job_id}', entity='lab-midas', project=project, config=args)
-        wandb_logger = [WandbLogger(name=f'{job}-{job_id}', entity='lab-midas', project=project, offline=offline_wandb, log_model=log_model)]
+        wandb_logger = [WandbLogger(name=f'{job}-{job_id}', entity='veronika-ecker', project=project, offline=offline_wandb, log_model=log_model)]
     else:
         wandb_logger = False
 
@@ -250,7 +252,9 @@ def main():
 
         if trainer.global_rank == 0 and not offline_wandb:
             wandb_logger[0].experiment.config.update(cfg)
-
+        # a = ds_train.__getitem__(0)
+        # print(a['key'])
+        # print(a['data'].shape)
         trainer.fit(model)
 
 

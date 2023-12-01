@@ -9,10 +9,10 @@
 #SBATCH --error=job.%J.%x.err
 #SBATCH --output=job.%J.%x.out
 
-export PRJ=/home/rakuest1/Documents/nako_ukb_age
-export DATA=/mnt/qdata/share/rakuest1/data
-export OUT=/mnt/qdata/share/rakuest1/results/UKB
-export PATH=/opt/conda/rakuest1/envs/merlin/bin:/opt/miniconda3/condabin:$PATH
+export PRJ=/home/raecker1/nako_ukb_age
+export DATA=/mnt/qdata/share/raecker1/data
+export OUT=/mnt/qdata/share/raecker1/results/UKB
+export PATH=/opt/conda/raecker1/envs/bio_age/bin:/opt/miniconda3/condabin:$PATH
 
 
 #SINGULARITYENV_PYTHONPATH=/home/rafruem1/nako_ukb_age singularity exec --bind /mnt --nv /home/rafruem1/nako_ukb_age.simg \
@@ -22,7 +22,7 @@ export CONFIG=$PRJ/config/volume/config_ukb_brain_meta.yaml
 cd $PRJ
 export PYTHONPATH=$PRJ
 # MIDASGPUWorker env: optox, denbi: nakoukb
-/opt/conda/rakuest1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train3d.py --config $CONFIG
+/opt/conda/raecker1/envs/bio_age/bin/python $PRJ/brainage/trainer/train3d.py --config $CONFIG
 #/opt/conda/rakuest1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train3d.py dataset.fold=0
 #/opt/conda/rakuest1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train3d.py dataset.fold=1
 #/opt/conda/rakuest1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train3d.py dataset.fold=2

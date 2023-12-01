@@ -1,7 +1,7 @@
 import time
 import logging
 import collections
-import copy
+#import copy
 from pathlib import Path
 
 import torch
@@ -70,7 +70,7 @@ class BrainDataset(AbstractDataset):
                           'label': label,
                           'key': key,
                           'sex': sex,
-                          'orientation': None}
+                          'orientation': 'None'}  #TODO: change back to NONE
                 yield sample
         self.data_container = collections.deque(load_data())
 

@@ -83,23 +83,23 @@ def convert_nifti_h5(input_dir, output_dir, output_file, verbose=False):
         affine = None
     hf.close()
 
-    '''
-    with h5py.File(h5_file, 'w') as hf:
-        grp_image = hf.create_group('image')
-        grp_affine = hf.create_group('affine')
-        for nifti_file in tqdm(nifti_files):
-            img = nib.load(nifti_file)
-            img_data = img.get_fdata().astype(np.float32)
-            affine = img.affine.astype(np.float16)
-            keyh5 = nifti_file.stem.split('.')[0]
-
-            # Write to h5 file
-            grp_image.create_dataset(keyh5, data=img_data)
-            grp_affine.create_dataset(keyh5, data=affine)
-
-            key = keyh5.split('_')[0]
-            keys.append(key)
-    '''
+    """
+        #with h5py.File(h5_file, 'w') as hf:
+            grp_image = hf.create_group('image')
+            grp_affine = hf.create_group('affine')
+            for nifti_file in tqdm(nifti_files):
+                img = nib.load(nifti_file)
+                img_data = img.get_fdata().astype(np.float32)
+                affine = img.affine.astype(np.float16)
+                keyh5 = nifti_file.stem.split('.')[0]
+    
+                # Write to h5 file
+                grp_image.create_dataset(keyh5, data=img_data)
+                grp_affine.create_dataset(keyh5, data=affine)
+    
+                key = keyh5.split('_')[0]
+                keys.append(key)
+    """
 
     keys = list(set(keys))  # remove duplicates of "*_2" and "*_3", revisits of patients?
     with open(output_dir.joinpath('keys', 'all.dat'), 'w') as f:   # interim_8000 was written and read as binary: "wb" / "rb" (above)
@@ -167,7 +167,7 @@ def main():
 
     output_dir.joinpath('keys').mkdir(exist_ok=True)
 
-    #keys = convert_nifti_h5(input_dir, output_dir, args.output_file, args.verbose)
+    keys = convert_nifti_h5(input_dir, output_dir, args.output_file, args.verbose)
     keys = write_keys(input_dir, output_dir, args.output_file, args.verbose)
     create_csv(keys, args.csv_input, output_dir.joinpath(args.csv_output), args.verbose)
     create_keys(keys, output_dir, n_folds=5)

@@ -50,6 +50,7 @@ dataset:
   fold: 0
   train: !ENV ${DATA}/UKB/interim/keys/train_imaging_kidney.dat  # containing keys with: key_left & key_right (left and right kidney)
   val:   !ENV ${DATA}/UKB/interim/keys/test_kidney.dat
+  gradcam_val: !ENV ${DATA}/UKB/interim/keys/test_kidney_gradcam.dat
   debug:
   #debug: !ENV ${DATA}/UKB/interim/keys/debug_kidney.dat
   data_augmentation: True

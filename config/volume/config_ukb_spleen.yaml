@@ -50,6 +50,7 @@ dataset:
   fold: 0
   train: !ENV ${DATA}/UKB/interim/keys/train_imaging_abdomen.dat
   val:   !ENV ${DATA}/UKB/interim/keys/test_abdomen.dat
+  gradcam_val: !ENV ${DATA}/UKB/interim/keys/test_abdomen_gradcam.dat
   debug:
   #debug: !ENV ${DATA}/UKB/interim/keys/debug.dat
   data_augmentation: True

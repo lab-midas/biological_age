@@ -7,13 +7,13 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import pytorch_lightning as pl
-from omegaconf import OmegaConf
+#from omegaconf import OmegaConf
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 
 from brainage.model.loss import l2_loss
 from brainage.model.architecture.resnet3d import generate_model
-from brainage.model.architecture.simple import SimpleCNN
+#from brainage.model.architecture.simple import SimpleCNN
 
 
 class AgeModel3DVolume(pl.LightningModule):
@@ -45,6 +45,7 @@ class AgeModel3DVolume(pl.LightningModule):
         self.strides = cfg['model']['strides']
         self.train_ds = train_ds
         self.val_ds = val_ds
+        self.val_outs = []
         self.no_max_pool = cfg['model']['no_max_pool'] or False
         self.offline_wandb = offline_wandb
         self.log_model = log_model
@@ -117,14 +118,15 @@ class AgeModel3DVolume(pl.LightningModule):
         self.log("validation/loss", loss)
         self.log('mse', mse)
         self.log('mae', mae)
-        return {'val_loss': loss,
-                'mse': mse,
+        self.val_outs.append({'val_loss': loss, 'mse': mse, 'mae': mae})    
+        return {'val_loss': loss, 
+                'mse': mse, 
                 'mae': mae}
 
-    def validation_epoch_end(self, outputs):
-        avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
-        avg_mae = torch.stack([x['mae'] for x in outputs]).mean()
-        avg_mse = torch.stack([x['mse'] for x in outputs]).mean()
+    def on_validation_epoch_end(self):
+        avg_loss = torch.stack([x['val_loss'] for x in self.val_outs]).mean()
+        avg_mae = torch.stack([x['mae'] for x in self.val_outs]).mean()
+        avg_mse = torch.stack([x['mse'] for x in self.val_outs]).mean()
         logs = {'val_loss': avg_loss, 'mae': avg_mae, 'mse': avg_mse}
         return {'val_loss': avg_loss, 'log': logs, 'progress_bar': logs}
 

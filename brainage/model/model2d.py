@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 import torch
-import dotenv
+# import dotenv
 import wandb
 import pandas as pd
 import numpy as np
@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 from omegaconf import OmegaConf
 
 from brainage.model.loss import class_loss, l2_loss
-from brainage.dataset.dataset2d import SliceDataset
+#from brainage.dataset.dataset2d import SliceDataset
 from brainage.model.architecture.resnet2d import generate_model
 
 # TODO upload checkpoints
@@ -133,7 +133,7 @@ class AgeModel2DSlices(pl.LightningModule):
                 'mse': F.mse_loss(y_pred, y), 
                 'mae': F.l1_loss(y_pred, y)}  
 
-    def validation_epoch_end(self, outputs):
+    def on_validation_epoch_end(self, outputs):
         avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
         avg_mae = torch.stack([x['mae'] for x in outputs]).mean()
         avg_mse = torch.stack([x['mse'] for x in outputs]).mean()
@@ -255,7 +255,7 @@ class AgeModel2DChannels(pl.LightningModule):
                 'mse': mse,
                 'mae': mae}
 
-    def validation_epoch_end(self, outputs):
+    def on_validation_epoch_end(self, outputs):
         avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
         avg_mae = torch.stack([x['mae'] for x in outputs]).mean()
         avg_mse = torch.stack([x['mse'] for x in outputs]).mean()
