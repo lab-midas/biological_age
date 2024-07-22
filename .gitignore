@@ -95,4 +95,7 @@ data/
 outputs/
 
 preprocess/stitching/
+results/
 experiments/job*
+preprocess/job*
+
