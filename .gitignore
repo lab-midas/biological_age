@@ -93,3 +93,5 @@ target/
 logs/
 data/
 outputs/
+
+preprocess/stitching/
