@@ -725,7 +725,8 @@ if __name__ == '__main__':
     # elapsed_time = time.time() - t
 
     file_list = list(zip_dir.glob('*.zip'))
-
+    file_list = file_list[32000:]
+    print(len(file_list))
     # multiprocessing
     num_cores = 10
     if args.cores:

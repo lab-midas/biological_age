@@ -1,4 +1,5 @@
 import os
+import pandas as pd
 import shutil
 import matplotlib.pyplot as plt
 import nibabel as nib
@@ -6,6 +7,26 @@ import tqdm
 import numpy as np
 import glob
 import h5py
+
+
+
+#output_dir = '/mnt/qdata/share/raecker1/ukbdata_70k/interim/'
+csv_input = '/mnt/qdata/rawdata/UKBIOBANK/baskets/4053862/ukb677731.csv'
+csv_input_2 = '/mnt/qdata/rawdata/UKBIOBANK/ukbdata_70k/ukb675384.csv'
+#csv_output = '/mnt/qdata/share/raecker1/ukbdata_70k/interim/ukb_all.csv'
+
+
+#df = pd.read_csv(csv_input, usecols=['eid', '21003-2.0', '31-0.0', '21002-0.0', '50-0.0'])
+df_1 = pd.read_csv(csv_input, usecols=['eid', '21003-2.0', '21003-1.0', '21003-0.0', '21022-0.0'])
+df_2 = pd.read_csv(csv_input_2, usecols=['eid', '20201-2.0', '20201-3.0'])
+df = pd.merge(df_2, df_1, how='inner', on='eid')
+#df = df.rename(columns={'eid': 'key', '21003-2.0': 'age', '31-0.0': 'sex', '21002-0.0': 'weight', '50-0.0': 'height'})
+#df.to_csv(csv_output)
+print('done')
+data = pd.read_csv('/mnt/qdata/share/raecker1/ukbdata_70k/interim/ukb_all.csv')
+#data = pd.read_csv('/mnt/qdata/rawdata/UKBIOBANK/baskets/4053862/ukb677731.csv')
+#data.to_feather('/home/raecker1/nako_ukb_age/ukb677731.feather')
+print('done')
 
 
 def copy_files(file_list, source_dir, destination_dir):

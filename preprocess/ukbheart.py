@@ -87,7 +87,7 @@ def segment_heart(data_list, seq_name='sa', seg4=False, save_seg=True, save_path
         bounding_boxes_ED = []
         bounding_boxes_ES = []
 
-        for data in data_list:
+        for i,data in enumerate(data_list):
             if '_'.join(Path(data).name.split('.')[0].split('_')[0:2]) in processed_list:
                 continue
 
@@ -97,8 +97,17 @@ def segment_heart(data_list, seq_name='sa', seg4=False, save_seg=True, save_path
             save_path_pat.mkdir(exist_ok=True)
             # Read the image
             print('  Reading {} ...'.format(image_name))
-            nim = nib.load(image_name)
-            image = nim.get_data()
+            try: 
+                nim = nib.load(image_name)
+                image = nim.get_data()
+            except Exception as e:
+                bounding_boxes_ED.append(None)
+                bounding_boxes_ES.append(None)
+                print('------------')
+                print(f'subject: {pat_name}')
+                print('------------')
+                print(e)
+                continue
             X, Y, Z, T = image.shape
             orig_image = image
 
@@ -157,8 +166,8 @@ def segment_heart(data_list, seq_name='sa', seg4=False, save_seg=True, save_path
                 bounding_boxes_ED.append(bounding_box_ED)
                 bounding_boxes_ES.append(bounding_box_ES)
             except:
-                bounding_boxes_ED.append([-1, -1, -1, -1, -1, -1])
-                bounding_boxes_ES.append([-1, -1, -1, -1, -1, -1])
+                bounding_boxes_ED.append((-1, -1, -1, -1, -1, -1))
+                bounding_boxes_ES.append((-1, -1, -1, -1, -1, -1))
 
             print('  Saving segmentation ...')
             nim2 = nib.Nifti1Image(pred, nim.affine)
@@ -182,6 +191,17 @@ def segment_heart(data_list, seq_name='sa', seg4=False, save_seg=True, save_path
             with open(Path(save_path).joinpath('processed_list.txt'), 'wb') as f:
                 pickle.dump(processed_list, f)
 
+            mode = 'a' if Path(save_path).joinpath('boundingbox_ES.csv').exists() else 'w'
+            with open(Path(save_path).joinpath('boundingbox_ES.csv'), mode) as out:
+                csv_out = csv.writer(out)
+                csv_out.writerow((pat_name,) + bounding_boxes_ES[i])
+
+            with open(Path(save_path).joinpath('boundingbox_ED.csv'), mode) as out:
+                csv_out = csv.writer(out)
+                csv_out.writerow((pat_name,) + bounding_boxes_ED[i])
+
+
+        """      
         with open(Path(save_path).joinpath('boundingbox_ES.csv'), 'w') as out:
             csv_out = csv.writer(out)
             for row in bounding_boxes_ES:
@@ -190,7 +210,7 @@ def segment_heart(data_list, seq_name='sa', seg4=False, save_seg=True, save_path
         with open(Path(save_path).joinpath('boundingbox_ED.csv'), 'w') as out:
             csv_out = csv.writer(out)
             for row in bounding_boxes_ED:
-                csv_out.writerow(row)
+                csv_out.writerow(row)"""
 
     print('Average segmentation time = {:.3f}s per sequence'.format(np.mean(table_time)))
     process_time = time.time() - start_time
@@ -422,10 +442,16 @@ def convert_nifti_h5(input_dir, output_dir, output_file, save_path, single_file=
         if not single_file and h5_dir.joinpath(keyh5 + '_sa.h5').exists():
             if h5py.File(h5_dir.joinpath(keyh5 + '_sa.h5'), 'r')['image/' + f'{keyh5}' + '_sa'].shape[0:2] == sel_shape[0:2]:
                 return
-
-        img = nib.load(nifti_file)
-        img_data = img.get_fdata().astype(np.float32)
-        affine = img.affine.astype(np.float16)
+        try: 
+            img = nib.load(nifti_file)
+            img_data = img.get_fdata().astype(np.float32)
+            affine = img.affine.astype(np.float16)
+        except Exception as e:
+            print('------------')
+            print(f'subject {nifti_file} failed to load')
+            print('------------')
+            print(e)
+            return
 
         # find patient
         if not '_'.join(keyh5.split('_')[0:2]) in pat_list:
@@ -468,7 +494,7 @@ def convert_nifti_h5(input_dir, output_dir, output_file, save_path, single_file=
         for nifti_file in tqdm(nifti_files):
             process_file(nifti_file)
     else:
-        num_cores = 8
+        num_cores = 10
         print(f'using {num_cores} CPU cores')
 
         t = time.time()
@@ -556,31 +582,37 @@ def main():
     parser.add_argument('--output_file', help='Output h5 file to store processed files.',
                         default='ukb_heart_preprocessed.h5')
     parser.add_argument('--csv_input', help='Input CSV file',
-                        default='/mnt/qdata/rawdata/UKBIOBANK/ukbdata/ukb46167.csv')
+                        default='/mnt/qdata/rawdata/UKBIOBANK/baskets/4053862/ukb677731.csv')
     parser.add_argument('--csv_output', help='Output CSV file', default='ukb_brain.csv')
     parser.add_argument('-v', '--verbose', action='store_true')
     args = parser.parse_args()
 
     #data_path = '/mnt/qdata/share/rakuest1/data/UKB/raw/sa_heart/raw'
-    save_path = '/mnt/qdata/share/rakuest1/data/UKB/raw/sa_heart/processed/seg'  # for segmentations
+    save_path = '/mnt/qdata/share/raecker1/ukbdata_70k/sa_heart/processed/seg'  # for segmentations
 
     input_dir = Path(args.input_dir)
     output_dir = Path(args.output_dir)
 
     # run segmentation on whole cohort first to get shapes of segmentation masks
-    #nifti_files = [f for f in Path(input_dir).glob('*.nii.gz')]
+    nifti_files = [f for f in Path(input_dir).glob('*.nii.gz')]
+    #print(nifti_files.index(Path('/mnt/qdata/share/raecker1/ukbdata_70k/sa_heart/raw/4681366_2_sa.nii.gz')))
+    #print(nifti_files.index(Path('/mnt/qdata/share/raecker1/ukbdata_70k/sa_heart/raw/4682757_2_sa.nii.gz')))
+    #print(nifti_files.index(Path('/mnt/qdata/share/raecker1/ukbdata_70k/sa_heart/raw/4676659_2_sa.nii.gz')))
+    #nifti_files = nifti_files[nifti_files.index(Path('/mnt/qdata/share/raecker1/ukbdata_70k/sa_heart/raw/4676659_2_sa.nii.gz'))+1:]
+    nifti_files = nifti_files[nifti_files.index(Path('/mnt/qdata/share/raecker1/ukbdata_70k/sa_heart/raw/4637290_2_sa.nii.gz')):]
+    print(f'segmenting {len(nifti_files)} images')
     #segment_heart(nifti_files, save_path=save_path)
     #get_bounding_boxes(save_path)
-    #convert_nifti_h5(input_dir, output_dir, args.output_file, save_path, single_file=False, verbose=False)
+    convert_nifti_h5(input_dir, output_dir, args.output_file, save_path, single_file=True, verbose=False)
     #merge_hdf5(input_dir, output_dir, args.output_file)
     #parse_hdf5(input_dir, output_dir, args.output_file)
-    df = pd.read_csv('/mnt/qdata/share/rakuest1/data/UKB/interim/ukb_heart_sizes.csv')
-    df_redo = df.copy()
-    df_redo = df_redo.loc[df_redo['h5size'] != '(72, 76, 8, 50)']
+    #df = pd.read_csv('/mnt/qdata/share/rakuest1/data/UKB/interim/ukb_heart_sizes.csv')
+    #df_redo = df.copy()
+    #df_redo = df_redo.loc[df_redo['h5size'] != '(72, 76, 8, 50)']
     #df_redo['h5size'] = df_redo['h5size'].apply(lambda x: np.fromstring(x.replace('(', '').replace(')', ''), dtype=int, sep=","))
     #df_redo['idx'] = df_redo['h5size'].apply(lambda x: np.all(x != np.asarray([72, 76, 8, 50])))
     #df_redo = df_redo.loc[df_redo['idx'] == True]
-    convert_nifti_h5(input_dir, output_dir, args.output_file, save_path, single_file=False, df_redo=None, verbose=False)
+    #convert_nifti_h5(input_dir, output_dir, args.output_file, save_path, single_file=False, df_redo=None, verbose=False)
 
 if __name__ == '__main__':
     main()

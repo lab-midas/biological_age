@@ -106,12 +106,12 @@ def get_keys(input_dir, output_dir):
 def create_csv(keys, csv_input, csv_output, verbose=False):
     # sex: 0=female, 1=male
     csv_in = pd.read_csv(csv_input, low_memory=False) # nrows=100000, cut aways a few corrupted lines at the end, header=0, names=['eid', '21022-0.0', '31-0.0', '21002-0.0', '50-0.0'])  # age, sex, weight, height
-    df_sel = csv_in[['eid', '21022-0.0', '31-0.0', '21002-0.0', '50-0.0']]
+    df_sel = csv_in[['eid', '21003-2.0', '31-0.0', '21002-0.0', '50-0.0']]
     # find header
     #csv_in_info = pd.read_csv(csv_input, nrows=10)
     #cols = [col for col in csv_in_info.columns if '12144' in col]
 
-    df = df_sel.rename(columns={'eid': 'key', '21022-0.0': 'age', '31-0.0': 'sex', '21002-0.0': 'weight', '50-0.0': 'height'})
+    df = df_sel.rename(columns={'eid': 'key', '21003-2.0': 'age', '31-0.0': 'sex', '21002-0.0': 'weight', '50-0.0': 'height'})
     keys_int = [int(k) for k in keys]
     df = df[df['key'].isin(keys_int)]  # filter out only patients with imaging data
     df.to_csv(Path(csv_output))
@@ -189,7 +189,7 @@ def main():
                                                  'Key creation for train, test, val')
     parser.add_argument('input_dir', help='Root input directory of all raw files')
     parser.add_argument('output_dir', help='Output directory for all files', default='/mnt/qdata/share/rakuest1/data/UKB/interim/')
-    parser.add_argument('--csv_input', help='Input CSV file', default='/mnt/qdata/rawdata/UKBIOBANK/ukbdata_50k/ukb51137.csv')
+    parser.add_argument('--csv_input', help='Input CSV file', default='/mnt/qdata/rawdata/UKBIOBANK/baskets/4053862/ukb677731.csv')
     parser.add_argument('--csv_output', help='Output CSV file', default='ukb_all.csv')
     parser.add_argument('-v', '--verbose', action='store_true')
     args = parser.parse_args()

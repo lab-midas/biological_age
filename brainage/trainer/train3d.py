@@ -93,8 +93,8 @@ def main():
     #                               tags=[job])
     
     # get keys and metadata
-    train_keys = [l.strip() for l in Path(train_set).open().readlines()]
-    val_keys = [l.strip() for l in Path(val_set).open().readlines()]
+    train_keys = [str(l.strip()) for l in Path(train_set).open().readlines()]
+    val_keys = [str(l.strip()) for l in Path(val_set).open().readlines()]
 
     print("=====================")
     print("Job: ", job)
@@ -234,16 +234,16 @@ def main():
 
     if args.predict is not None:
         ckpt_config = loadYaml(args.predict)
-        ckpt_path = os.path.join(os.environ['PRJ'], ckpt_config['checkpoints'][job][0], 'checkpoints')
+        ckpt_path = os.path.join(os.environ['CKPT'], ckpt_config['checkpoints'][job][0], 'checkpoints')
         ckpt_path = [os.path.join(ckpt_path, f) for f in os.listdir(ckpt_path) if f.endswith('.ckpt') and f.startswith('epoch=199')]
         model.load_state_dict(torch.load(str(ckpt_path[0]))['state_dict'])
         trainer = Trainer(accelerator='gpu', devices=1, strategy="ddp")  # cfg['trainer']['gpus']
         trainer.predict(model, model.dataloader(ds_val))
-        result_path = os.path.join(os.path.dirname(data_path), 'results', job + '_val.csv')
+        result_path = os.path.join(os.environ['OUT'], 'results', job + '_val.csv')
         model.write_results(result_path)
         model.reset_results()
         trainer.predict(model, model.dataloader(ds_train))
-        result_path = os.path.join(os.path.dirname(data_path), 'results', job + '_train.csv')
+        result_path = os.path.join(os.environ['OUT'], 'results', job + '_train.csv')
         model.write_results(result_path)
 
     else:  # train

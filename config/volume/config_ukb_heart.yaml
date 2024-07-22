@@ -42,15 +42,15 @@ loader:
 
 dataset:
   mode: volume
-  data: !ENV ${DATA}/UKB/interim/ukb_heart_preprocessed.h5
+  data: !ENV ${DATA}/interim/ukb_heart_preprocessed.h5
   group: image
-  info: !ENV ${DATA}/UKB/interim/ukb_all.csv
+  info: !ENV ${DATA}/interim/ukb_all.csv
   column: age
   preload: False
   fold: 0
-  train: !ENV ${DATA}/UKB/interim/keys/train_imaging.dat
-  val:   !ENV ${DATA}/UKB/interim/keys/test.dat
-  gradcam_val: !ENV ${DATA}/UKB/interim/keys/test_gradcam.dat
+  train: !ENV ${DATA}/interim/keys/train_heart_mainly_healthy.dat
+  val:   !ENV ${DATA}/interim/keys/test_heart_mainly_healthy.dat
+  #gradcam_val: !ENV ${DATA}/interim/keys/test_gradcam.dat
   debug:
   #debug: ${env:DATA}/UKB/interim/keys/debug.dat
   data_augmentation: True

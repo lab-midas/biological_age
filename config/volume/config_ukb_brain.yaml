@@ -42,16 +42,16 @@ loader:
 
 dataset:
   mode: volume
-  data: !ENV ${DATA}/UKB/interim/ukb_brain_preprocessed.h5
+  data: !ENV ${DATA}/interim/ukb_brain_preprocessed.h5
   group: image
-  info: !ENV ${DATA}/UKB/interim/ukb_all.csv
+  info: !ENV ${DATA}/interim/ukb_all.csv
   column: age
   preload: False
   fold: 0
-  train: !ENV ${DATA}/UKB/interim/keys/train_imaging.dat
-  val:   !ENV ${DATA}/UKB/interim/keys/test.dat
+  train: !ENV ${DATA}/interim/keys/train_brain_mainly_healthy.dat
+  val:   !ENV ${DATA}/interim/keys/test_brain_mainly_healthy.dat
   debug:
-  #debug: !ENV ${DATA}/UKB/interim/keys/debug.dat
+  #debug: !ENV ${DATA}/interim/keys/debug.dat
   data_augmentation: True
   crop_size:
   crop_margins:

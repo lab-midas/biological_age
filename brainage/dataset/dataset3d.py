@@ -70,7 +70,7 @@ class BrainDataset(AbstractDataset):
                           'label': label,
                           'key': key,
                           'sex': sex,
-                          'orientation': 'None'}  #TODO: change back to NONE
+                          'orientation': ''}  #TODO: change back to NONE
                 yield sample
         self.data_container = collections.deque(load_data())
 
@@ -131,10 +131,10 @@ class HeartDataset(AbstractDataset):
                 label = info_df.loc[key][column]
                 sex = info_df.loc[key]['sex']
                 group_str = group + '/' if group else ''
-
+                
                 for idx in [2, 3]:
-                    keyh5 = key + '_' + str(idx)
-                    #if Path(self.datapath).joinpath(keyh5 + '_sa.h5').exists():
+                    keyh5 = key + '_' + str(idx) + '_sa'
+                    # if Path(self.datapath).joinpath(keyh5 + '_sa.h5').exists():
                     if f'{group_str}{keyh5}' in fhandle:
                         break
                     else:
@@ -150,7 +150,7 @@ class HeartDataset(AbstractDataset):
                           'label': label,
                           'key': key,
                           'sex': sex,
-                          'orientation': None}
+                          'orientation': ''}
                 yield sample
         self.data_container = collections.deque(load_data())
 
@@ -171,6 +171,101 @@ class HeartDataset(AbstractDataset):
         if self.meta:
             sample['position'] = ds['sex']
         return sample
+
+"""class HeartDataset(AbstractDataset):
+    def __init__(self,
+                 data,
+                 keys,
+                 info,
+                 group,
+                 column='label',
+                 preload=False,
+                 meta=False,
+                 ukb=True,
+                 transform=None):
+
+        super().__init__()
+
+        # copy over
+        self.transform = transform
+        self.logger = logging.getLogger(__name__)
+        self.preload = preload
+        self.meta = meta
+        self.info = info
+        self.column = column
+        self.ukb = ukb
+        self.group = group
+        self.data = data
+        self.data_container = None
+
+        self.logger.info('opening dataset ...')
+        self.logger.info(info)
+
+        self.keys = [l.strip() for l in Path(keys).open().readlines()] if isinstance(keys, str) else keys
+
+        self.logger.info('loading h5 dataset ...')
+        #self.datapath = Path(data).with_suffix('')  # multiple h5 files
+        #self.logger.info(self.datapath)
+        with h5py.File(data, 'r') as file:
+            self.dataset_len = len(file[list(file.keys())[0]])
+        #fhandle = h5py.File(data, 'r')
+        self.logger.info(data)
+
+        #self.data_container = collections.deque(load_data())
+
+    def __len__(self):
+        return self.dataset_len
+
+    def __getitem__(self, i):
+        def load_data():
+            if self.ukb:
+                info_df = pd.read_csv(self.info, index_col=0, usecols=[1, 2, 3, 4, 5],
+                                      dtype={'key': 'string', self.column: np.float32})
+            else:
+                info_df = pd.read_csv(self.info, index_col=0, dtype={'key': 'string', self.column: np.float32})
+            for key in tqdm(self.keys):
+                label = info_df.loc[key][self.column]
+                sex = info_df.loc[key]['sex']
+                group_str = self.group + '/' if self.group else ''
+                fhandle = h5py.File(self.data, 'r')
+
+                for idx in [2, 3]:
+                    keyh5 = key + '_' + str(idx) + '_sa'
+                    # if Path(self.datapath).joinpath(keyh5 + '_sa.h5').exists():
+                    if f'{group_str}{keyh5}' in fhandle:
+                        break
+                    else:
+                        keyh5 = ''
+
+                # fhandle = h5py.File(self.datapath.joinpath(keyh5 + '_sa.h5'), 'r')
+
+                if self.preload:
+                    data = fhandle[f'{group_str}{keyh5}'][:]  # keyh5_sa for multiple h5 files
+                else:
+                    data = fhandle[f'{group_str}{keyh5}']
+                data = np.squeeze(data[:, :, np.random.randint(np.shape(data)[2], size=1), :])  # take a random slice -> data: X x Y x Time
+                sample = {'data': data,
+                          'label': label,
+                          'key': key,
+                          'sex': sex,
+                          'orientation': ''}
+                yield sample
+
+        if self.data_container is None:
+            self.data_container = collections.deque(load_data())
+        ds = self.data_container[i]
+        sample = {'data':   ds['data'][:][np.newaxis, np.newaxis, ...].astype(np.float32),
+                  'label':  ds['label'],
+                  'key':    ds['key'],
+                  'orientation': ds['orientation']}
+        # data augmentation
+        # data tensor format B x C X H X W X D (B=C=1)
+        if self.transform:
+            sample = self.transform(**sample)
+        sample['data'] = np.squeeze(sample['data'], axis=0)
+        if self.meta:
+            sample['position'] = ds['sex']
+        return sample"""
 
 
 class AbdomenDataset(AbstractDataset):
@@ -217,7 +312,7 @@ class AbdomenDataset(AbstractDataset):
                     orientation = keyh5.split('/')[1]
                 else:
                     keyh5 = key
-                    orientation = None
+                    orientation = ''
                 label = info_df.loc[key][column]
                 sex = info_df.loc[key]['sex']
                 group_str = group + '/' if group else ''

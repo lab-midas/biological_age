@@ -113,12 +113,12 @@ def convert_nifti_h5(input_dir, output_dir, output_file, verbose=False):
 def create_csv(keys, csv_input, csv_output, verbose=False):
     # sex: 0=female, 1=male
     csv_in = pd.read_csv(csv_input, low_memory=False) # nrows=100000, cut aways a few corrupted lines at the end, header=0, names=['eid', '21022-0.0', '31-0.0', '21002-0.0', '50-0.0'])  # age, sex, weight, height
-    df_sel = csv_in[['eid', '21022-0.0', '31-0.0', '21002-0.0', '50-0.0']]
+    df_sel = csv_in[['eid', '21003-2.0', '31-0.0', '21002-0.0', '50-0.0']]
     # find header
     #csv_in_info = pd.read_csv(csv_input, nrows=10)
     #cols = [col for col in csv_in_info.columns if '12144' in col]
 
-    df = df_sel.rename(columns={'eid': 'key', '21022-0.0': 'age', '31-0.0': 'sex', '21002-0.0': 'weight', '50-0.0': 'height'})
+    df = df_sel.rename(columns={'eid': 'key', '21003-2.0': 'age', '31-0.0': 'sex', '21002-0.0': 'weight', '50-0.0': 'height'})
     keys_int = [int(k) for k in keys]
     df = df[df['key'].isin(keys_int)]  # filter out only patients with imaging data
     df.to_csv(Path(csv_output))
@@ -128,26 +128,26 @@ def create_keys(keys, output_dir, n_folds=5):
     train_set, test_set = train_test_split(keys, test_size=0.2, random_state=42)
     train_folds = []
     test_folds = []
-    for train_index, test_index in KFold(n_splits=n_folds).split(keys):
+    """for train_index, test_index in KFold(n_splits=n_folds).split(keys):
         train_folds.append([keys[idx] for idx in train_index])
-        test_folds.append([keys[idx] for idx in test_index])
+        test_folds.append([keys[idx] for idx in test_index])"""
 
-    with open(output_dir.joinpath('keys', 'train.dat'), 'w') as f:
+    with open(output_dir.joinpath('keys', 'train_brain_mainly_healthy.dat'), 'w') as f:
         for item in train_set:
             f.write("%s\n" % item)
 
-    with open(output_dir.joinpath('keys', 'test.dat'), 'w') as f:
+    with open(output_dir.joinpath('keys', 'test_brain_mainly_healthy.dat'), 'w') as f:
         for item in test_set:
             f.write("%s\n" % item)
 
-    for i in range(n_folds):
+    """for i in range(n_folds):
         with open(output_dir.joinpath('keys', 'train{}.dat'.format(i)), 'w') as f:
             for item in train_folds[i]:
                 f.write("%s\n" % item)
         with open(output_dir.joinpath('keys', 'test{}.dat'.format(i)), 'w') as f:
             for item in test_folds[i]:
                 f.write("%s\n" % item)
-
+"""
 def main():
     parser = argparse.ArgumentParser(description='Preprocessing pipeline for UK Biobank T1 brain MRI data.\n' \
                                                  'CSV creation\n' \
@@ -156,7 +156,7 @@ def main():
     parser.add_argument('input_dir', help='Input directory of all nifti files (*.nii.gz)')
     parser.add_argument('output_dir', help='Output directory for all files', default='/mnt/qdata/share/rakuest1/data/UKB/interim/')
     parser.add_argument('--output_file', help='Output h5 file to store processed files.', default='ukb_brain_preprocessed.h5')
-    parser.add_argument('--csv_input', help='Input CSV file', default='/mnt/qdata/rawdata/UKBIOBANK/ukbdata/ukb46167.csv')
+    parser.add_argument('--csv_input', help='Input CSV file', default='/mnt/qdata/rawdata/UKBIOBANK/baskets/4053862/ukb677731.csv')
     parser.add_argument('--csv_output', help='Output CSV file', default='ukb_brain.csv')
     parser.add_argument('-v', '--verbose', action='store_true')
     args = parser.parse_args()
@@ -167,12 +167,16 @@ def main():
 
     output_dir.joinpath('keys').mkdir(exist_ok=True)
 
-    keys = convert_nifti_h5(input_dir, output_dir, args.output_file, args.verbose)
-    keys = write_keys(input_dir, output_dir, args.output_file, args.verbose)
-    create_csv(keys, args.csv_input, output_dir.joinpath(args.csv_output), args.verbose)
-    create_keys(keys, output_dir, n_folds=5)
+    #keys = convert_nifti_h5(input_dir, output_dir, args.output_file, args.verbose)
+    #keys = write_keys(input_dir, output_dir, args.output_file, args.verbose)
+    #create_csv(keys, args.csv_input, output_dir.joinpath(args.csv_output), args.verbose)
+    keys = pd.read_csv('/mnt/qdata/share/raecker1/ukbdata_70k/interim/keys/ukb_keys_mainly_healthy_brain.csv', header=None)
+    keys = keys[0].to_list()
+    #create_keys(keys, output_dir, n_folds=5)
+    print('done')
 
 
 if __name__ == '__main__':
     # python3 ukbbrain.py /mnt/qdata/share/rakuest1/data/UKB/raw/t1_brain/processed /mnt/qdata/share/rakuest1/data/UKB/interim/
     main()
+
