@@ -98,4 +98,5 @@ preprocess/stitching/
 results/
 experiments/job*
 preprocess/job*
+lightning_logs/
 
