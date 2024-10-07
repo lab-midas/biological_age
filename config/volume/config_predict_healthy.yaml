@@ -1,0 +1,30 @@
+checkpoints:
+  ukb_t1brain_volume:
+    - age/1pz5zwh9
+  ukb_t1brain_volume_meta:
+    - age/
+  ukb_fundus:
+    - age/
+  ukb_fundus_meta:
+    - age/
+  ukb_heart_volume:
+    - age/ov766db9
+  ukb_heart_volume_meta:
+    - age/
+  ukb_kidney_volume:
+    - age/
+  ukb_kidney_volume_meta:
+    - age/
+  ukb_liver_volume:
+    - age/
+  ukb_liver_volume_meta:
+    - age/
+  ukb_pancreas_volume:
+    - age/
+  ukb_pancreas_volume_meta:
+    - age/
+  ukb_spleen_volume:
+    - age/
+  ukb_spleen_volume_meta:
+    - age/
+

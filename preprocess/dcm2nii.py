@@ -8,6 +8,8 @@ Example:
 Todo:
     * ...
 """
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 import multiprocessing
 import os
@@ -15,9 +17,10 @@ import sys
 import time
 import re
 import tempfile
-import pydicom as dicom
+#import pydicom as dicom
 from pathlib import Path
 import sys
+import pydicom
 import dicom2nifti
 import dicom2nifti.settings
 import SimpleITK as sitk
@@ -88,11 +91,12 @@ def sort_dcm_dir(dicom_dir):
     """
 
     dicom_dir = Path(dicom_dir)
+    
     dicom_files = get_dcm_names(dicom_dir)
     contrasts = ['fat', 'water', 'in', 'opp']
 
     for contrast in contrasts:
-        dicom_dir.joinpath(contrast).mkdir()
+        dicom_dir.joinpath(contrast).mkdir(exist_ok=True)
 
     # get echo times
     echo_times = set(())
@@ -104,7 +108,7 @@ def sort_dcm_dir(dicom_dir):
     for f in dicom_files:
         dicomfile = dicom.read_file(f)
         # print(str(file))
-        print(dicomfile[0x00511019].value)
+        #print(dicomfile[0x00511019].value)
         if 'DIXF' in dicomfile[0x00511019].value:  # fat
             shutil.copy(f, str(dicom_dir.joinpath(contrasts[0])))
         elif 'DIXW' in dicomfile[0x00511019].value:  # water
@@ -116,7 +120,63 @@ def sort_dcm_dir(dicom_dir):
 
     #shutil.rmtree(dicom_dir)
 
-def get_tags_in_files(dicom_path, only_first=True, tag_file_path=''):
+
+def create_manifest_file_nako(dicom_dir):
+    """Create manifest file for NAKO zipped data."""
+    columns = ["filename", "patientid", "studyid", "study discription", "date", "seriesid", "series discription", "aet", "host"]
+    df = pd.DataFrame(columns=columns)
+
+    dicom_dir = Path(dicom_dir)
+    for root, _, files in os.walk(dicom_dir):
+        for dicom_file in files:
+            file_path = os.path.join(root, dicom_file)
+            if dicom2nifti.compressed_dicom.is_dicom_file(file_path):
+                dicom_headers = dicom2nifti.compressed_dicom.read_file(file_path,
+                                                           defer_size="1 KB",
+                                                           stop_before_pixels=False,
+                                                           force=dicom2nifti.settings.pydicom_read_force)
+                
+                entry = pd.DataFrame.from_dict({
+                    "filename": [dicom_file],
+                    "patientid": [dicom_headers.PatientID],
+                    "studyid": [dicom_headers.StudyInstanceUID],
+                    "study discription": [dicom_headers.StudyDescription],
+                    "date": [dicom_headers.StudyDate],
+                    "seriesid": [dicom_headers.SeriesInstanceUID],
+                    "series discription": [dicom_headers.SeriesDescription],
+                    "aet": [dicom_headers.ManufacturerModelName],
+                    "host": [dicom_headers.StationName]
+                })
+                df = pd.concat([df, entry], ignore_index=True)
+    df.to_csv(dicom_dir.joinpath('manifest.csv'), index=False)
+
+
+def create_location_info_csv(dicom_dir):
+    columns = ["filename", "AcquisitionNumber", "ImagePositionPatient", "SeriesNumber", "SliceLocation"]
+    df = pd.DataFrame(columns=columns)
+
+    dicom_dir = Path(dicom_dir)
+    for root, _, files in os.walk(dicom_dir):
+        for dicom_file in files:
+            file_path = os.path.join(root, dicom_file)
+            if dicom2nifti.compressed_dicom.is_dicom_file(file_path):
+                dicom_headers = dicom2nifti.compressed_dicom.read_file(file_path,
+                                                           defer_size="1 KB",
+                                                           stop_before_pixels=False,
+                                                           force=dicom2nifti.settings.pydicom_read_force)
+                
+                entry = pd.DataFrame.from_dict({
+                    "filename": [dicom_file],
+                    "AcquisitionNumber": [dicom_headers.AcquisitionNumber],
+                    "ImagePositionPatient": [dicom_headers.ImagePositionPatient],
+                    "SeriesNumber": [dicom_headers.SeriesNumber],
+                    "SliceLocation": [dicom_headers.SliceLocation]
+                })
+                df = pd.concat([df, entry], ignore_index=True)
+    df.to_csv(dicom_dir.joinpath('location_info.csv'), index=False)
+
+        
+def get_tags_in_files(dicom_path, only_first=True, tag_file_path=None):
     """
     get_tags_in_files iterates over a directory, finds dicom files with
     a .dcm extension, and finds all unique dicom tag instances. it then
@@ -128,7 +188,7 @@ def get_tags_in_files(dicom_path, only_first=True, tag_file_path=''):
         dict: A dictionary containing the tags loaded.
     """
     # create the output directory
-    if not tag_file_path:
+    if tag_file_path is not None:
         if not os.path.exists(os.path.dirname(tag_file_path)):
             os.makedirs(os.path.dirname(tag_file_path))
 
@@ -136,7 +196,7 @@ def get_tags_in_files(dicom_path, only_first=True, tag_file_path=''):
     tags_in_files = {}
     dicom_file_paths = file_paths(filtered_walk(dicom_path, included_files=["*.dcm", "*.ima"]))
     if only_first:
-        dicom_file_paths = [dicom_file_paths[0]]
+        dicom_file_paths = [next(dicom_file_paths)]
 
     for dicom_file_path in dicom_file_paths:
         dicom_file = pydicom.read_file(dicom_file_path)
@@ -152,7 +212,7 @@ def get_tags_in_files(dicom_path, only_first=True, tag_file_path=''):
     )
 
     # write out the file
-    if not tag_file_path:
+    if tag_file_path is not None:
         with open(tag_file_path, "w") as f:
             writer = csv.writer(f)
             writer.writerow(["group", "element", "keyword", "name"])
@@ -186,7 +246,7 @@ def directory_to_csv(dicom_path, csv_file_path, tags_in_files, tags_to_exclude, 
     )
     dicom_file_paths = file_paths(filtered_walk(dicom_path, included_files=["*.dcm", "*.ima"]))
     if only_first:
-        dicom_file_paths = [dicom_file_paths[0]]
+        dicom_file_paths = [next(dicom_file_paths)]
 
     with open(csv_file_path, "w") as f:
         writer = csv.writer(f)
@@ -221,6 +281,7 @@ def directory_to_csv(dicom_path, csv_file_path, tags_in_files, tags_to_exclude, 
 
             row_vals.append(dicom_file_path)
             writer.writerow(row_vals)
+
 
 def dcm2nii_zipped(zip_file, output_dir,
                    add_id=False,
@@ -323,7 +384,9 @@ def dcm2nii_zipped_dixon(zip_file, output_dir,
     output_dir = Path(output_dir)
 
     # create temp directory
+    # create temp directory
     tmp = tempfile.TemporaryDirectory()
+    #tmp = Path(f'/mnt/qdata/share/raecker1/dcm/{str(zip_file).split("/")[-1].split(".")[0]}')
     # get subject id
     subj_id = re.match('.*([0-9]{6}).*', f.name).group(1)
 
@@ -333,6 +396,7 @@ def dcm2nii_zipped_dixon(zip_file, output_dir,
     # unzip to temp directory
     try:
         unzip(f, tmp.name)
+        #unzip(f, tmp)
     except:
         print(f'zip error {subj_id}', file=sys.stderr)
         return
@@ -349,8 +413,10 @@ def dcm2nii_zipped_dixon(zip_file, output_dir,
     try:
         # sort dcm directory
         dcm_dir = next(Path(tmp.name).glob('*'))
-        sort_dcm_dir(next(dcm_dir.glob('*')))
-
+        #dcm_dir = next(Path(tmp).glob('*'))
+        dcm_dir = next(dcm_dir.glob('*'))
+        sort_dcm_dir(dcm_dir)
+        
         for contrast in contrasts:
             # create subfolder foreach contrast, if single_dir = False
             contrast_dest_dir = dest_dir.joinpath(contrast)
@@ -379,6 +445,7 @@ def dcm2nii_zipped_dixon(zip_file, output_dir,
             shutil.rmtree(dest_dir)
 
     except:
+
         print(f'conversion error {subj_id}', file=sys.stderr)
         shutil.rmtree(dest_dir)
 
@@ -386,6 +453,7 @@ def dcm2nii_zipped_dixon(zip_file, output_dir,
         # delete tmp directory
         tmp.cleanup()
         return
+    
 
 def nii_zipped_brain(zip_file, output_dir,
                    add_id=False,
@@ -476,6 +544,81 @@ def nii_zipped_brain(zip_file, output_dir,
     finally:
         # delete tmp directory
         tmp.cleanup()
+
+
+def nii_zipped_sa_heart_nako(zip_file, output_dir, add_id=False, single_dir=False, csv='', verbose=False):
+    """Convert zipped sequences to nifti.
+
+    Converts zipped NAKO DICOM data stored in a sequence folder
+    (e.g.'/mnt/data/rawdata/NAKO_195/NAKO-195_MRT-Dateien/3D_GRE_TRA_W')
+    to .nii files in a defined output folder
+    (such as '/mnt/data/rawdata/NAKO_195_nii/NAKO-195_MRT-Dateien/3D_GRE_TRA_W')
+
+    Args:
+        zip_file (str/Path): zip file to extract
+        output_dir (str/Path): output directory for nifti files
+        add_id (bool): add subject id (parsed from zip filename) as praefix
+        single_dir (bool): save nifti files in a single directory (no subdirs)
+        verbose (bool): activate prints
+    """
+    output_dir = Path(output_dir)
+    f = Path(zip_file)
+    run_id = f.name.split('_')[2].split('.')[0]
+    subj_id = re.match('.*([0-9]{6}).*', f.name).group(1)
+
+    if output_dir.joinpath('raw', subj_id + '_' + run_id + '_sa.nii.gz').exists():
+        print(f'{subj_id} already converted', file=sys.stdout)
+        return
+
+    # create temp directory
+    tmp = tempfile.TemporaryDirectory()
+    # get subject id
+
+
+    if verbose:
+        print('unzipping: ', f)
+
+    # unzip to temp directory
+    try:
+        unzip(f, tmp.name)
+    except:
+        print(f'zip error {subj_id}', file=sys.stderr)
+        return
+    
+    dicom_dir = next(Path(tmp.name).glob('*'))
+    dicom_dir = next(dicom_dir.glob('*'))
+
+    #create_manifest_file_nako(dicom_dir)
+
+    # create folder with subject id
+    #dest_dir = output_dir.joinpath(subj_id)
+    #dest_dir.mkdir(exist_ok=True)
+    output_dir.joinpath('raw').mkdir(exist_ok=True)
+    output_dir.joinpath('processed').mkdir(exist_ok=True)
+
+    #if os.path.exists(os.path.join(dicom_dir, 'manifest.cvs')):
+    #    os.system('cp {0} {1}'.format(os.path.join(dicom_dir, 'manifest.cvs'),
+    #                                  os.path.join(dicom_dir, 'manifest.csv')))
+    #process_manifest(os.path.join(dicom_dir, 'manifest.csv'),
+    #                 os.path.join(dicom_dir, 'manifest2.csv'))
+    #df2 = pd.read_csv(os.path.join(dicom_dir, 'manifest2.csv'), error_bad_lines=False)
+
+    # Convert dicom files and annotations into nifti images
+    try:
+        dset = NAKO_Biobank_Dataset_Cardiac_CINE_SA(dicom_dir)
+        dset.read_dicom_images()
+        Path(tmp.name).joinpath('nii').mkdir(exist_ok=True)
+        dset.convert_dicom_to_nifti(os.path.join(tmp.name, 'nii'))
+        # get corresponding nifti
+        shutil.move(os.path.join(tmp.name, 'nii', 'sa.nii.gz'), output_dir.joinpath('raw', subj_id + '_' + run_id + '_sa.nii.gz'))
+
+    except:
+        print(f'conversion error {subj_id}', file=sys.stderr)
+
+    finally:
+        # delete tmp directory
+        tmp.cleanup()
+
 
 def nii_zipped_sa_heart(zip_file, output_dir,
                    add_id=False,
@@ -707,8 +850,12 @@ if __name__ == '__main__':
                 dcm2nii_zipped_dixon(f, out_dir, args.id,
                                      args.singledir, args.csv, args.verbose)
             else:
-                dcm2nii_zipped(f, out_dir, args.id,
+                if args.study == 'brain':
+                    dcm2nii_zipped(f, out_dir, args.id,
                                args.singledir, args.csv, args.verbose)
+                elif args.study == 'sa_heart':
+                    nii_zipped_sa_heart_nako(f, out_dir, args.id, args.singledir, args.csv, args.verbose)
+                    #dcm2nii_zipped(f, out_dir, args.id, args.singledir, args.csv, args.verbose)
         else:
             if args.study == 'brain':
                 nii_zipped_brain(f, out_dir, args.id, args.singledir, args.csv, args.verbose)
@@ -725,17 +872,25 @@ if __name__ == '__main__':
     # elapsed_time = time.time() - t
 
     file_list = list(zip_dir.glob('*.zip'))
-    file_list = file_list[32000:]
-    print(len(file_list))
+    #start_index = file_list.index(zip_dir.joinpath('110679_30_3D_GRE_TRA_W_COMPOSED.zip'))
+    #start_index = 280
+    #file_list = file_list[start_index+1:]
+    #print(f'processing {len(file_list)} files')
+    #print(f'start with id: {start_index+1}')
+
+
     # multiprocessing
     num_cores = 10
     if args.cores:
         num_cores = args.cores
+
     print(f'using {num_cores} CPU cores')
 
     t = time.time()
-    results = Parallel(n_jobs=num_cores)(
-        delayed(process_file)(f) for f in file_list)
+    #for f in file_list:
+    #    process_file(f)
+        
+    results = Parallel(n_jobs=num_cores)(delayed(process_file)(f) for f in file_list)
     elapsed_time = time.time() - t
 
     print(f'elapsed time: {time.strftime("%H:%M:%S", time.gmtime(elapsed_time))}')

@@ -7,9 +7,19 @@ import tqdm
 import numpy as np
 import glob
 import h5py
+from pathlib import Path
 
 
+input_dir = Path('/mnt/qdata/rawdata/UKBIOBANK/ukbdata_50k/abdominal_MRI/processed/seg_ori')
+output_dir = Path('/mnt/qdata/share/raecker1/ukbdata_70k/abdominal_MRI/seg')
+seg_files = os.listdir('/mnt/qdata/rawdata/UKBIOBANK/ukbdata_50k/abdominal_MRI/processed/seg_ori')
 
+for seg_file in seg_files:
+    if input_dir.joinpath(seg_file).is_dir() and not output_dir.joinpath(seg_file).exists():
+        output_dir.joinpath(seg_file).symlink_to(input_dir.joinpath(seg_file), target_is_directory=True)
+
+
+    print('done')
 #output_dir = '/mnt/qdata/share/raecker1/ukbdata_70k/interim/'
 csv_input = '/mnt/qdata/rawdata/UKBIOBANK/baskets/4053862/ukb677731.csv'
 csv_input_2 = '/mnt/qdata/rawdata/UKBIOBANK/ukbdata_70k/ukb675384.csv'

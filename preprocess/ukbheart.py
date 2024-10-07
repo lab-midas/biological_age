@@ -578,7 +578,7 @@ def main():
                                                  'Key creation for train, test, val')
     parser.add_argument('input_dir', help='Input directory of all nifti files (*.nii.gz)')
     parser.add_argument('output_dir', help='Output directory for all files',
-                        default='/mnt/qdata/share/rakuest1/data/UKB/interim/')
+                        default='/mnt/qdata/share/raeckev1/nako_30k/interim/')
     parser.add_argument('--output_file', help='Output h5 file to store processed files.',
                         default='ukb_heart_preprocessed.h5')
     parser.add_argument('--csv_input', help='Input CSV file',
@@ -588,7 +588,8 @@ def main():
     args = parser.parse_args()
 
     #data_path = '/mnt/qdata/share/rakuest1/data/UKB/raw/sa_heart/raw'
-    save_path = '/mnt/qdata/share/raecker1/ukbdata_70k/sa_heart/processed/seg'  # for segmentations
+    save_path = '/mnt/qdata/share/raeckev1/nako_30k/sa_heart/processed/seg'  # for segmentations
+    Path(save_path).mkdir(parents=True, exist_ok=True)
 
     input_dir = Path(args.input_dir)
     output_dir = Path(args.output_dir)
@@ -599,11 +600,11 @@ def main():
     #print(nifti_files.index(Path('/mnt/qdata/share/raecker1/ukbdata_70k/sa_heart/raw/4682757_2_sa.nii.gz')))
     #print(nifti_files.index(Path('/mnt/qdata/share/raecker1/ukbdata_70k/sa_heart/raw/4676659_2_sa.nii.gz')))
     #nifti_files = nifti_files[nifti_files.index(Path('/mnt/qdata/share/raecker1/ukbdata_70k/sa_heart/raw/4676659_2_sa.nii.gz'))+1:]
-    nifti_files = nifti_files[nifti_files.index(Path('/mnt/qdata/share/raecker1/ukbdata_70k/sa_heart/raw/4637290_2_sa.nii.gz')):]
+    #nifti_files = nifti_files[nifti_files.index(Path('/mnt/qdata/share/raecker1/ukbdata_70k/sa_heart/raw/4637290_2_sa.nii.gz')):]
     print(f'segmenting {len(nifti_files)} images')
-    #segment_heart(nifti_files, save_path=save_path)
+    segment_heart(nifti_files, save_path=save_path)
     #get_bounding_boxes(save_path)
-    convert_nifti_h5(input_dir, output_dir, args.output_file, save_path, single_file=True, verbose=False)
+    #convert_nifti_h5(input_dir, output_dir, args.output_file, save_path, single_file=True, verbose=False)
     #merge_hdf5(input_dir, output_dir, args.output_file)
     #parse_hdf5(input_dir, output_dir, args.output_file)
     #df = pd.read_csv('/mnt/qdata/share/rakuest1/data/UKB/interim/ukb_heart_sizes.csv')

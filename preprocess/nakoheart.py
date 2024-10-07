@@ -12,6 +12,7 @@ from pathlib import Path
 
 import urllib.request
 
+
 def segment_heart(data_list, seq_name='sa', seg4=False, save_seg=True, save_path='./seg'):
     # data_list         list of nifti files to process (full string path)
     # seq_name          sequence name ['sa', 'la_2ch', 'la_4ch']

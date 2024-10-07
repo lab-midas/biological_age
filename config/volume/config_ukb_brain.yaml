@@ -48,8 +48,9 @@ dataset:
   column: age
   preload: False
   fold: 0
-  train: !ENV ${DATA}/interim/keys/train_brain_mainly_healthy.dat
-  val:   !ENV ${DATA}/interim/keys/test_brain_mainly_healthy.dat
+  train: !ENV ${DATA}/interim/keys/train_brain_healthy.dat
+  val:   !ENV ${DATA}/interim/keys/test_brain_healthy.dat
+  pred:  !ENV ${DATA}/interim/keys/full_test_brain_healthy.dat
   debug:
   #debug: !ENV ${DATA}/interim/keys/debug.dat
   data_augmentation: True

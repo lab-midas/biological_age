@@ -46,7 +46,10 @@ def main():
     info = cfg['dataset']['info']
     infocolumn = cfg['dataset']['column']
     train_set = cfg['dataset']['train']
-    val_set = cfg['dataset']['val']
+    if args.predict:
+        val_set = cfg['dataset']['pred']
+    else:
+        val_set = cfg['dataset']['val']
     debug_set = cfg['dataset']['debug'] or None
     if debug_set:
         train_set = debug_set
@@ -239,11 +242,11 @@ def main():
         model.load_state_dict(torch.load(str(ckpt_path[0]))['state_dict'])
         trainer = Trainer(accelerator='gpu', devices=1, strategy="ddp")  # cfg['trainer']['gpus']
         trainer.predict(model, model.dataloader(ds_val))
-        result_path = os.path.join(os.environ['OUT'], 'results', job + '_val.csv')
+        result_path = os.path.join(os.environ['OUT'], job + '_val.csv')
         model.write_results(result_path)
         model.reset_results()
         trainer.predict(model, model.dataloader(ds_train))
-        result_path = os.path.join(os.environ['OUT'], 'results', job + '_train.csv')
+        result_path = os.path.join(os.environ['OUT'], job + '_train.csv')
         model.write_results(result_path)
 
     else:  # train

@@ -21,6 +21,9 @@
     fail in reading certain DICOM images, perhaps due to the DICOM format, which has no standard
     and vary between manufacturers and machines.
 """
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
 import os
 import re
 import pickle
@@ -29,6 +32,9 @@ import pydicom as dicom
 import SimpleITK as sitk
 import numpy as np
 import nibabel as nib
+import pandas as pd
+from pathlib import Path
+import matplotlib.pyplot as plt
 
 
 def repl(m):
@@ -59,6 +65,142 @@ class BaseImage(object):
         nim.header['pixdim'][4] = self.dt
         nim.header['sform_code'] = 1
         nib.save(nim, filename)
+
+
+class NAKO_Biobank_Dataset_Cardiac_CINE_SA(object):
+    """ Class for managing Biobank datasets """
+    def __init__(self, input_dir, cvi42_dir=None):
+        """
+            Initialise data
+            This is important, otherwise the dictionaries will not be cleaned between instances.
+            """
+        self.data = {}
+
+        input_dir = Path(input_dir)
+        self.files = [f for f in input_dir.glob('*') if re.match(r'^[\d.]+\.dcm$', f.name)] # only numbers, dots and .dcm allowed in filename
+
+        # Find and sort the DICOM sub directories
+        self.slice_locations, self.slice_groups, d = self.sort_dicom_files(input_dir)
+
+        d = dicom.read_file(self.slice_groups[self.slice_locations[0]][0])
+        d_slc2 = dicom.read_file(self.slice_groups[self.slice_locations[1]][0])
+        d_tfr2 = dicom.read_file(self.slice_groups[self.slice_locations[0]][1])
+
+        self.z = len(self.slice_locations)
+        self.t = d.CardiacNumberOfImages
+        self.x = d.Columns
+        self.y = d.Rows
+
+        self.dx = float(d.PixelSpacing[1])
+        self.dy = float(d.PixelSpacing[0])
+        if hasattr(d, 'SpacingBetweenSlices'):
+            self.dz = float(d.SpacingBetweenSlices)
+        else:
+            print('Warning: can not find attribute SpacingBetweenSlices. \n Use attribute SliceThickness instead.')
+            self.dz = float(d.SliceThickness)
+        self.dt = (d_tfr2.TriggerTime - d.TriggerTime) * 1e-3
+        
+        self.affine = self.get_affine(d, d_slc2)
+
+    def sort_dicom_files(self, dicom_dir):
+        """ Sort the files according to their SliceLocation and InstanceNumber. """
+        df = pd.DataFrame(columns=['File', 'SliceLocation'])
+                        
+        # Walk through the input directory and get the SliceLocation for each file
+        for root, _, files in os.walk(dicom_dir):
+            for file in files:
+                file_path = os.path.join(root, file)
+                try:
+                    d = dicom.read_file(file_path)
+                    
+                    df = df.append({
+                        'File': file_path,
+                        'SliceLocation': d.SliceLocation,
+                        'TriggerTime': d.TriggerTime if 'TriggerTime' in d else None,
+                    }, ignore_index=True)
+                except Exception as e:
+                    print(f"Error reading DICOM file {file_path}: {e}")
+
+        # Group filenames by their slice location and sort within each group by TriggerTime
+        slice_groups = df.groupby('SliceLocation').apply(
+            lambda x: x.sort_values('TriggerTime')['File'].tolist()
+        ).to_dict()
+        
+        slice_locations = sorted(list(slice_groups.keys()))
+        
+        return slice_locations, slice_groups, d
+
+    def get_affine(self, d, d2):
+        # Affine matrix which converts the voxel coordinate to world coordinate
+        pos_ul = np.array([float(x) for x in d.ImagePositionPatient])
+        pos_ul[:2] = -pos_ul[:2]
+
+        dx = float(d.PixelSpacing[1])
+        dy = float(d.PixelSpacing[0])
+
+        # Image orientation
+        axis_x = np.array([float(x) for x in d.ImageOrientationPatient[:3]])
+        axis_y = np.array([float(x) for x in d.ImageOrientationPatient[3:]])
+        axis_x[:2] = -axis_x[:2]
+        axis_y[:2] = -axis_y[:2]
+
+        # Read a dicom file at the second slice
+        pos_ul2 = np.array([float(x) for x in d2.ImagePositionPatient])
+        pos_ul2[:2] = -pos_ul2[:2]
+        axis_z = pos_ul2 - pos_ul
+        axis_z = axis_z / np.linalg.norm(axis_z)
+
+        affine = np.eye(4)
+        affine[:3, 0] = axis_x * dx
+        affine[:3, 1] = axis_y * dy
+        affine[:3, 2] = axis_z * self.dz
+        affine[:3, 3] = pos_ul
+
+        return affine
+
+    def read_dicom_images(self):
+        """ Read dicom images and store them in a 3D-t volume. """
+        # Sort files into groups according to their slice location
+        volume = np.zeros((self.x, self.y, self.z, self.t), dtype='float32')
+        for z in range(self.z):
+            files = self.slice_groups[self.slice_locations[z]]
+            if len(files) == 50:
+                files = files[::2]
+            for tfr, file in enumerate(files):
+                try:
+                    d = dicom.read_file(file)
+                    volume[:, :, z, tfr] = d.pixel_array.transpose()
+                except IndexError:
+                    print('Warning: dicom file missing for {0}: time point {1}. '
+                            'Image will be copied from the previous time point.')
+                    volume[:, :, z, tfr] = volume[:, :, z, tfr - 1]
+                except (ValueError, TypeError):
+                    print('Warning: failed to read pixel_array from file {0}. '
+                            'Image will be copied from the previous time point.')
+                    volume[:, :, z, tfr] = volume[:, :, z, tfr - 1]
+                except NotImplementedError:
+                    print('Warning: failed to read pixel_array from file {0}. '
+                            'pydicom cannot handle compressed dicom files. '
+                            'Switch to SimpleITK instead.')
+                    reader = sitk.ImageFileReader()
+                    reader.SetFileName(file)
+                    img = sitk.GetArrayFromImage(reader.Execute())
+                    volume[:, :, z, tfr] = np.transpose(img[0], (1, 0))
+                except:
+                    print('Warning: failed to read pixel_array from file {0}. ')
+        print('done')
+        print(volume.shape)
+
+        # Store the image
+        self.data['sa'] = BaseImage()
+        self.data['sa'].volume = volume
+        self.data['sa'].affine = self.affine
+        self.data['sa'].dt = self.dt
+
+    def convert_dicom_to_nifti(self, output_dir):
+        """ Save the image in nifti format. """
+        for name, image in self.data.items():
+            image.WriteToNifti(os.path.join(output_dir, '{0}.nii.gz'.format(name)))
 
 
 class Biobank_Dataset(object):

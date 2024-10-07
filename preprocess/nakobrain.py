@@ -135,14 +135,15 @@ def fcm_normalize(input_file,
 
 def process_brain_t1(input_file,
                      output_dir,
-                     reference_file='/mnt/qdata/tools/fsl/ref/MNI152_T1_1mm.nii.gz',
-                     robex_dir='/mnt/qdata/tools/robex',
+                     reference_file='/mnt/qdata/software/fsl/ref/MNI152_T1_1mm.nii.gz',
+                     robex_dir='/mnt/qdata/software/robex',
                      split=0,
                      verbose=False):
     print(split)
     input_file = Path(input_file)
     reference_file = Path(reference_file)
     output_dir = Path(output_dir)
+    output_dir.mkdir(exist_ok=True)
 
     # create output directories
     output_dir.joinpath('raw').mkdir(exist_ok=True)
@@ -215,7 +216,7 @@ def main():
                                                  'FLIRT MNI152 coregistration\n' \
                                                  'ROBEX skull stripping\n' \
                                                  'FCM WM intensity normalization')
-    parser.add_argument('input_file', help='Input file (T1w brain MRI, .nii.gz)')
+    parser.add_argument('input_dir', help='Input directory with files (T1w brain MRI, .nii.gz)')
     parser.add_argument('output_dir', help='Output directory to store processed files.')
     parser.add_argument('--reference', help='MNI152-1mm reference .nii.gz file')
     parser.add_argument('--robex', help='ROBEX installation directory.')
@@ -240,12 +241,18 @@ def main():
     if args.split:
         split = args.split
 
-    process_brain_t1(args.input_file,
-                     args.output_dir,
-                     reference_file=reference_file,
-                     robex_dir=robex_dir,
-                     split=split,
-                     verbose=args.verbose)
+    input_dir = Path(args.input_dir)
+    output_dir = Path(args.output_dir)
+    file_list = list(input_dir.glob('*.nii.gz'))
+
+    for file in file_list:
+        out_file_dir = output_dir.joinpath(file.stem.split('.')[0])
+        process_brain_t1(file,
+                        out_file_dir,
+                        reference_file=reference_file,
+                        robex_dir=robex_dir,
+                        split=split,
+                        verbose=args.verbose)
 
 
 if __name__ == '__main__':

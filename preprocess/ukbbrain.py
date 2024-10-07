@@ -17,6 +17,7 @@ from tqdm import tqdm
 import numpy as np
 from sklearn.model_selection import train_test_split, KFold
 
+
 def write_keys(input_dir, output_dir, output_file, verbose=False):
     # Create output directory if it does not exist
     output_dir.mkdir(exist_ok=True)
@@ -42,6 +43,7 @@ def write_keys(input_dir, output_dir, output_file, verbose=False):
             f.write(key + '\n')
 
     return keys
+
 
 def convert_nifti_h5(input_dir, output_dir, output_file, verbose=False):
     """
@@ -123,6 +125,7 @@ def create_csv(keys, csv_input, csv_output, verbose=False):
     df = df[df['key'].isin(keys_int)]  # filter out only patients with imaging data
     df.to_csv(Path(csv_output))
 
+
 def create_keys(keys, output_dir, n_folds=5):
     # 80% / 20 % split for train / test
     train_set, test_set = train_test_split(keys, test_size=0.2, random_state=42)
@@ -148,6 +151,8 @@ def create_keys(keys, output_dir, n_folds=5):
             for item in test_folds[i]:
                 f.write("%s\n" % item)
 """
+
+
 def main():
     parser = argparse.ArgumentParser(description='Preprocessing pipeline for UK Biobank T1 brain MRI data.\n' \
                                                  'CSV creation\n' \

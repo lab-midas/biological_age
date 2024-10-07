@@ -698,7 +698,7 @@ def main():
     # Create output directory if it does not exist
     input_dir = Path(args.input_dir)
     output_dir = Path(args.output_dir)
-    save_path = Path('/mnt/qdata/share/rakuest1/data/UKB/raw/abdominal_MRI/processed/seg_ori')  # for segmentations
+    save_path = Path('/mnt/qdata/share/raecker1/ukbdata_70k/abdominal_MRI/seg')  # for segmentations
 
     output_dir.joinpath('keys').mkdir(exist_ok=True)
 
