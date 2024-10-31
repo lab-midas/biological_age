@@ -1,10 +1,10 @@
+import os
 import time
 import logging
 import collections
 #import copy
 from pathlib import Path
 import matplotlib.pyplot as plt
-
 import torch
 import h5py
 import numpy as np
@@ -38,7 +38,7 @@ class BrainDataset(AbstractDataset):
         if ukb:
             info_df = pd.read_csv(info, index_col=0, usecols=[1,2,3,4,5], dtype={'key': 'string', column: np.float32})
         else:
-            info_df = pd.read_csv(info, index_col=0, dtype={'key': 'string', column: np.float32})
+            info_df = pd.read_csv(info, index_col='key', dtype={'key': 'string', column: np.float32})
         self.keys = [l.strip() for l in Path(keys).open().readlines()] if isinstance(keys, str) else keys
 
         self.logger.info('loading h5 dataset ...')
@@ -119,7 +119,7 @@ class HeartDataset(AbstractDataset):
         if ukb:
             info_df = pd.read_csv(info, index_col=0, usecols=[1,2,3,4,5], dtype={'key': 'string', column: np.float32})
         else:
-            info_df = pd.read_csv(info, index_col=0, dtype={'key': 'string', column: np.float32})
+            info_df = pd.read_csv(info, index_col='key', dtype={'key': 'string', column: np.float32})
         self.keys = [l.strip() for l in Path(keys).open().readlines()] if isinstance(keys, str) else keys
 
         #self.keys = self.keys[:500]    # for debugging ToDo: remove  
@@ -133,14 +133,17 @@ class HeartDataset(AbstractDataset):
                 label = info_df.loc[key][column]
                 sex = info_df.loc[key]['sex']
                 group_str = group + '/' if group else ''
-                
-                for idx in [2, 3]:
-                    keyh5 = key + '_' + str(idx) + '_sa'
-                    # if Path(self.datapath).joinpath(keyh5 + '_sa.h5').exists():
-                    if f'{group_str}{keyh5}' in fhandle:
-                        break
-                    else:
-                        keyh5 = ''
+
+                if ukb:
+                    for idx in [2, 3]:
+                        keyh5 = key + '_' + str(idx) + '_sa'
+                        # if Path(self.datapath).joinpath(keyh5 + '_sa.h5').exists():
+                        if f'{group_str}{keyh5}' in fhandle:
+                            break
+                        else:
+                            keyh5 = ''
+                else:
+                    keyh5 = key
 
                 #fhandle = h5py.File(self.datapath.joinpath(keyh5 + '_sa.h5'), 'r')
                 if self.preload:
@@ -161,7 +164,7 @@ class HeartDataset(AbstractDataset):
 
     def __getitem__(self, i):
         ds = self.data_container[i]
-        plt.imsave(f'/home/raecker1/nako_ukb_age/dummy_heart_img.png', ds['data'][...,0])
+        #plt.imsave(f'/home/raecker1/nako_ukb_age/dummy_heart_img.png', ds['data'][...,0])
         sample = {'data':   ds['data'][:][np.newaxis, np.newaxis, ...].astype(np.float32),
                   'label':  ds['label'],
                   'key':    ds['key'],
@@ -189,7 +192,6 @@ class AbdomenDataset(AbstractDataset):
                  transform=None):
 
         super().__init__()
-
         # copy over
         self.transform = transform
         self.logger = logging.getLogger(__name__)
@@ -201,10 +203,13 @@ class AbdomenDataset(AbstractDataset):
         if ukb:
             info_df = pd.read_csv(info, index_col=0, usecols=[1,2,3,4,5], dtype={'key': 'string', column: np.float32})
         else:
-            info_df = pd.read_csv(info, index_col=0, dtype={'key': 'string', column: np.float32})
+            info_df = pd.read_csv(info, index_col='key', dtype={'key': 'string', column: np.float32})
         self.keys = [l.strip() for l in Path(keys).open().readlines()] if isinstance(keys, str) else keys
 
-        self.contrasts = ['fat', 'inp', 'opp', 'wat']
+        if ukb:
+            self.contrasts = ['fat', 'inp', 'opp', 'wat']
+        else:
+            self.contrasts = ['fat', 'in', 'opp', 'water']
         self.logger.info('loading h5 dataset ...')
         #self.datapath = Path(data).with_suffix('')  # multiple h5 files
         #self.logger.info(self.datapath)
@@ -217,7 +222,10 @@ class AbdomenDataset(AbstractDataset):
                 if '/' in key:  # combined kidney set
                     keyh5 = key
                     key = key.split('/')[0]
-                    orientation = keyh5.split('/')[1]
+                    if ukb:
+                        orientation = keyh5.split('/')[1]
+                    else:
+                        orientation =  '/' + keyh5.split('/')[1]
                 else:
                     keyh5 = key
                     orientation = ''
@@ -225,23 +233,31 @@ class AbdomenDataset(AbstractDataset):
                 sex = info_df.loc[key]['sex']
                 group_str = group + '/' if group else ''
 
-                #for idx in [2, 3]:
-                #    keyh5 = key + '_' + str(idx)
-                #    #if Path(self.datapath).joinpath(keyh5 + '_sa.h5').exists():
-                #    if f'{group_str}{keyh5}' in fhandle:
-                #        break
-                #    else:
-                #        keyh5 = ''
-
                 #fhandle = h5py.File(self.datapath.joinpath(keyh5 + '_sa.h5'), 'r')
                 data = []
                 for contrast in self.contrasts:
                     group_str_inner = group_str + contrast + '/'
-                    if self.preload:
-                        data.append(fhandle[f'{group_str_inner}{keyh5}'][:])
+                    if ukb:
+                        if self.preload:
+                            data.append(fhandle[f'{group_str_inner}{keyh5}'][:])
+                        else:
+                            data.append(f'{group_str_inner}{keyh5}')  # not pickable due to multiprocessing, move actual HDF5 file access to get_item
                     else:
-                        data.append(f'{group_str_inner}{keyh5}')  # not pickable due to multiprocessing, move actual HDF5 file access to get_item
+                        try:
+                            if self.preload:
+                                data.append(fhandle[f'{group_str_inner}{keyh5}'][:])
+                            else:
+                                data.append(f'{group_str_inner}{keyh5}')  # not pickable due to multiprocessing, move actual HDF5 file access to get_item
+                        except:
+                            keyh5 = key + '_30' + orientation
+                            #print(keyh5)
+                            if self.preload:
+                                data.append(fhandle[f'{group_str_inner}{keyh5}'][:])
+                            else:
+                                data.append(f'{group_str_inner}{keyh5}')  # not pickable due to multiprocessing, move actual HDF5 file access to get_item
                 #data = np.concatenate(data, axis=0)  # data: C x X x Y x Z
+                if not ukb:
+                    orientation = orientation[1:] if orientation != '' else orientation
                 sample = {'data': data,
                           'label': label,
                           'key': key,

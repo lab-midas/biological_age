@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import h5py
 import pandas as pd
 import matplotlib.pyplot as plt
 import sys
@@ -25,32 +26,30 @@ def create_keys(keys, output_dir, fname, n_folds=5):
             f.write("%s\n" % item)
 
 
-def create_ukb_all():
-    #output_dir = '/mnt/qdata/share/raecker1/ukbdata_70k/interim/'
-    csv_input = '/mnt/qdata/rawdata/UKBIOBANK/baskets/4053862/ukb677731.csv'
-    csv_input_2 = '/mnt/qdata/rawdata/UKBIOBANK/ukbdata_70k/ukb675384.csv'
-    csv_output = '/mnt/qdata/share/raecker1/ukbdata_70k/interim/ukb_all.csv'
-
-
-    """df_1 = pd.read_csv(csv_input, usecols=['eid', '21003-2.0', '31-0.0', '21002-0.0', '50-0.0'])
-    #df_1 = pd.read_csv(csv_input, usecols=['eid', '21003-2.0', '21003-1.0', '21003-0.0', '21022-0.0'])
-    df_2 = pd.read_csv(csv_input_2, usecols=['eid', '20201-2.0', '20201-3.0', '20209-2.0', '20209-3.0', '20252-2.0', '20252-3.0'])
-    df = pd.merge(df_2, df_1, how='inner', on='eid')
-    df = df.rename(columns={'eid': 'key', '21003-2.0': 'age', '31-0.0': 'sex', '21002-0.0': 'weight', '50-0.0': 'height'})"""
-    #df = df.set_index('key')
-    info_df = pd.read_csv(csv_output, index_col=0, usecols=[1,2,3,4,5], dtype={'key': 'string', 'age': np.float32})
+def get_imaging_data(h5_path, output_dir, organ):
+    print(f'(1) get keys from imaging data in h5 file for {organ}')
+    fhandle = h5py.File(h5_path, 'r')
+    if organ == 'brain' or organ == 'heart':
+        group = fhandle['image']
+    else:
+        group = fhandle['water']
+    keys = group.keys()
     print('done')
-    #df.to_csv(csv_output, columns=['key', 'age', 'sex', 'weight', 'height'])
+    with open(output_dir.joinpath('keys', f'{organ}_imaging.dat'), 'w') as f:
+        for key in keys:
+            f.write("%s\n" % key[:6])
 
 
-def adjust_imaging_and_meta_data():
-    key_file = 'ukb_keys_healthy_heart_full.csv'
-    key_file_out = 'ukb_keys_healthy_heart.csv'
-    #image_path = '/mnt/qdata/share/raecker1/ukbdata_70k/t1_brain/raw'
-    image_path = '/mnt/qdata/share/raecker1/ukbdata_70k/sa_heart/processed/seg'
-    organ = 'heart'
+def get_images_wo_age_label(organ, csv_input, output_dir):
+    print(f'(2) get keys with image data but without age label for {organ}')
+    df = pd.read_csv(csv_input)
+    df_no_age_label = df[df['age'].isnull()]
+    df_no_age_label.to_csv(output_dir.joinpath(f'images_without_age_label_{organ}.csv'), index=False)
 
-    output_dir = Path('/mnt/qdata/share/raecker1/ukbdata_70k/interim/')
+
+def adjust_imaging_and_meta_data(organ, key_file, key_file_out, output_dir):
+    print(f'(3) get keys after adjusting for missing data or labels for {organ}')
+    # imaging data
     data_df = pd.DataFrame({'key': [l.strip().split('_')[0] for l in output_dir.joinpath('keys', f'{organ}_imaging.dat').open().readlines()]}, dtype=str)
     #img_list = os.listdir(image_path)
     #data_df = pd.DataFrame({'key': [l.split('_')[0] for l in img_list]})
@@ -66,23 +65,16 @@ def adjust_imaging_and_meta_data():
     df_filtered.to_csv(os.path.join(output_dir, 'keys', key_file_out), index=None, header=None)
 
 
-def create_train_test():
-    key_file = 'ukb_keys_healthy_heart.csv'
-    out_name = 'heart_healthy'
-
-    output_dir = Path('/mnt/qdata/share/raecker1/ukbdata_70k/interim')
-    keys = pd.read_csv(f'/mnt/qdata/share/raecker1/ukbdata_70k/interim/keys/{key_file}', header=None)
+def create_train_test(key_file, output_dir, out_name):
+    print(f'(4) split in train and test set for {organ}')
+    keys = pd.read_csv(os.path.join(output_dir, 'keys', key_file), header=None)
     keys = keys[0].to_list()
     create_keys(keys, output_dir, out_name, n_folds=1)
 
-def get_full_test_set_keys():
-    organ = 'heart'
-    output_dir = Path('/mnt/qdata/share/raecker1/ukbdata_70k/interim')
-    #image_path = '/mnt/qdata/share/raecker1/ukbdata_70k/t1_brain/raw'
-    #image_path = '/mnt/qdata/share/raecker1/ukbdata_70k/sa_heart/processed/seg'
-    train_set = '/mnt/qdata/share/raecker1/ukbdata_70k/interim/keys/train_heart_mainly_healthy.dat'
-    fname = 'heart_mainly_healthy'
 
+def get_full_test_set_keys(organ, output_dir, out_name):
+    print(f'(5) get full test set including test set of training and unhealthy participants for {organ}')
+    train_set = output_dir.joinpath('keys', f'train_{out_name}.dat')
 
     img_df = pd.DataFrame({'key': [l.strip().split('_')[0] for l in output_dir.joinpath('keys', f'{organ}_imaging.dat').open().readlines()]}, dtype=str)                                                 # get all image keys
     img_wo_age = pd.read_csv(os.path.join(output_dir, f'images_without_age_label_{organ}.csv'), header=None, names=['key'], dtype=str)     # get all image keys without age label
@@ -92,36 +84,41 @@ def get_full_test_set_keys():
     df_out = df_filtered[~df_filtered['key'].isin(set(train_df['key']))]    # filter out images in train set
     test_key_list = df_out['key'].to_list()
 
-    with open(output_dir.joinpath('keys', f'full_test_{fname}.dat'), 'w') as f:
+    with open(output_dir.joinpath('keys', f'full_test_{out_name}.dat'), 'w') as f:
         for key in test_key_list:
             f.write("%s\n" % key)
 
 
-def create_csv_images_wo_age_label():
-    organ_key = '20252'
-    organ = 'brain'
-    csv_input = '/mnt/qdata/rawdata/UKBIOBANK/baskets/4053862/ukb677731.csv'
-    csv_input_2 = '/mnt/qdata/rawdata/UKBIOBANK/ukbdata_70k/ukb675384.csv'
-    df_1 = pd.read_csv(csv_input, usecols=['eid', '21003-2.0'])
-    df_2 = pd.read_csv(csv_input_2, usecols=['eid', f'{organ_key}-2.0', f'{organ_key}-3.0'])
-
-    df_in_2_notin_1 = df_2[~df_2['eid'].isin(df_1['eid'])]
-    print(len(df_in_2_notin_1))
-
-    df_merged = pd.merge(df_1, df_2, on='eid', how='inner')
-    df_no_age_label = df_merged[(df_merged[f'{organ_key}-2.0'].notnull() | df_merged[f'{organ_key}-3.0'].notnull()) & df_merged['21003-2.0'].isnull()]
-    print(len(df_no_age_label))
-    df_exclude = pd.concat([df_no_age_label['eid'], df_in_2_notin_1['eid']]).drop_duplicates()
-    print(len(df_exclude))
-    df_exclude.to_csv(f'/mnt/qdata/share/raecker1/ukbdata_70k/interim/images_without_age_label_{organ}.csv', index=False)
-
-
 if __name__ == '__main__':
-    key_file = 'ukb_keys_mainly_healthy_heart.csv'
-    out_name = 'heart_mainly_healthy'
+    #organs = ['brain', 'heart', 'kidneys', 'liver', 'spleen', 'pancreas']
+    organs = ['kidneys', 'liver', 'spleen', 'pancreas']
+    """h5_paths = [
+        'ukb_brain_preprocessed.h5', 
+        'ukb_heart_preprocessed.h5', 
+        'ukb_lkd_preprocessed.h5', 
+        'ukb_liv_preprocessed.h5', 
+        'ukb_spl_preprocessed.h5', 
+        'ukb_pnc_preprocessed.h5'
+    ]"""
+    h5_paths = ['ukb_lkd_preprocessed.h5', 
+        'ukb_liv_preprocessed.h5', 
+        'ukb_spl_preprocessed.h5', 
+        'ukb_pnc_preprocessed.h5']
+    
+    #csv_input = '/mnt/qdata/rawdata/NAKO_706/NAKO_706_META/30k/NAKO-707_export_baseline.csv'
+    csv_output = '/mnt/qdata/rawdata/UKBIOBANK/ukb_70k/interim/ukb_all.csv'
+    #create_ukb_all(csv_input, csv_output)
+    for i, organ in enumerate(organs):
+        key_file = f'ukb_keys_mainly_healthy_{organ}_full.csv'
+        out_name = f'{organ}_mainly_healthy'
+        key_file_out = f'ukb_keys_mainly_healthy_{organ}.csv'
 
-    output_dir = Path('/mnt/qdata/share/raecker1/ukbdata_70k/interim')
-    keys = pd.read_csv(f'/mnt/qdata/share/raecker1/ukbdata_70k/interim/keys/{key_file}', header=None)
-    keys = keys[0].to_list()
-    create_keys(keys, output_dir, out_name, n_folds=1)
-    #adjust_imaging_and_meta_data()
+        output_dir = Path('/mnt/qdata/rawdata/UKBIOBANK/ukb_70k/interim')
+        #h5_path = output_dir.joinpath(h5_paths[i])
+
+        #get_imaging_data(h5_path, output_dir, organ)
+        #get_images_wo_age_label(organ, csv_output, output_dir)
+        adjust_imaging_and_meta_data(organ, key_file, key_file_out, output_dir)
+        create_train_test(key_file_out, output_dir, out_name)
+        get_full_test_set_keys(organ, output_dir, out_name)
+

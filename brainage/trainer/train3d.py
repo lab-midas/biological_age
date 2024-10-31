@@ -90,6 +90,15 @@ def main():
     elif 'fundus' in job:
         dataset = 'fundus'
 
+    if 'ukb' in Path(data_path).stem:
+        ukb = True
+        cohort = 'UK Biobank'
+    elif 'nako' in Path(data_path).stem:
+        ukb = False
+        cohort = 'NAKO'
+    else:
+        raise ValueError("Dataset not found")
+
     #neptune_logger = NeptuneLogger(project_name=f'lab-midas/{project}',
     #                               params=OmegaConf.to_container(cfg, resolve=True),
     #                               experiment_name=f'{job}-{job_id}',
@@ -102,6 +111,7 @@ def main():
     print("=====================")
     print("Job: ", job)
     print("Dataset: ", dataset)
+    print("Cohort: ", cohort)   
     print("=====================")
 
     assert data_mode in ['patchwise', 'volume']
@@ -121,6 +131,7 @@ def main():
                             column=infocolumn,
                             patch_size=patch_size,
                             preload=preload,
+                            ukb=ukb,
                             transform=train_transform)
 
         ds_val = BrainPatchDataset(data=data_path,
@@ -130,6 +141,7 @@ def main():
                             patch_size=patch_size,
                             group=data_group,
                             preload=preload,
+                            ukb=ukb,
                             transform=val_transform) 
 
     elif data_mode == 'volume':
@@ -156,6 +168,7 @@ def main():
                                 column=infocolumn,
                                 preload=preload,
                                 meta=meta,
+                                ukb=ukb,
                                 transform=train_transform)
 
             ds_val = BrainDataset(data=data_path,
@@ -165,6 +178,7 @@ def main():
                                 group=data_group,
                                 preload=preload,
                                 meta=meta,
+                                ukb=ukb,
                                 transform=val_transform)
         elif dataset == 'heart':
             ds_train = HeartDataset(data=data_path,
@@ -174,6 +188,7 @@ def main():
                                     column=infocolumn,
                                     preload=preload,
                                     meta=meta,
+                                    ukb=ukb,
                                     transform=train_transform)
 
             ds_val = HeartDataset(data=data_path,
@@ -183,6 +198,7 @@ def main():
                                   group=data_group,
                                   preload=preload,
                                   meta=meta,
+                                  ukb=ukb,
                                   transform=val_transform)
 
         elif dataset == 'abdominal':
@@ -193,6 +209,7 @@ def main():
                                     column=infocolumn,
                                     preload=preload,
                                     meta=meta,
+                                    ukb=ukb,
                                     transform=train_transform)
 
             ds_val = AbdomenDataset(data=data_path,
@@ -202,6 +219,7 @@ def main():
                                   group=data_group,
                                   preload=preload,
                                   meta=meta,
+                                  ukb=ukb,
                                   transform=val_transform)
 
         elif dataset == 'fundus':
@@ -212,6 +230,7 @@ def main():
                                     column=infocolumn,
                                     preload=preload,
                                     meta=meta,
+                                    ukb=ukb,
                                     transform=train_transform)
 
             ds_val = FundusDataset(data=data_path,
@@ -221,6 +240,7 @@ def main():
                                   group=data_group,
                                   preload=preload,
                                   meta=meta,
+                                  ukb=ukb,
                                   transform=val_transform)
 
     if dataset == 'fundus':

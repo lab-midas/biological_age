@@ -1,16 +1,25 @@
 import os
-import math
-import time
-import pickle
 import csv
-import numpy as np
-import nibabel as nib
-import tensorflow as tf
-from skimage.exposure import rescale_intensity
-from skimage.measure import regionprops
-from pathlib import Path
+import glob
+import re
+import time
 
+import numpy as np
+import pandas as pd
+import dateutil.parser
+from tqdm import tqdm
+import matplotlib.pyplot as plt
+from biobank_utils import *
 import urllib.request
+import tensorflow as tf
+from pathlib import Path
+from tqdm import tqdm
+import h5py
+import math
+from image_utils import rescale_intensity
+from skimage.measure import label, regionprops
+import argparse
+from joblib import Parallel, delayed
 
 
 def segment_heart(data_list, seq_name='sa', seg4=False, save_seg=True, save_path='./seg'):
@@ -208,3 +217,399 @@ def segment_heart(data_list, seq_name='sa', seg4=False, save_seg=True, save_path
     print('Including image I/O, CUDA resource allocation, '
           'it took {:.3f}s for processing {:d} subjects ({:.3f}s per subjects).'.format(
         process_time, 1, process_time ))
+
+
+def get_bounding_boxes(save_path):
+    pat_list = [p.name for p in Path(save_path).iterdir() if
+                      p.is_dir() and ('seg_sa_ES.nii.gz' in os.listdir(Path(save_path).joinpath(p)))]
+    bounding_boxes_ED = []
+    bounding_boxes_ES = []
+    for pat in tqdm(pat_list):
+        pred_ED = nib.load(Path(save_path).joinpath(pat, 'seg_sa_ED.nii.gz')).get_fdata()
+        pred_ES = nib.load(Path(save_path).joinpath(pat, 'seg_sa_ES.nii.gz')).get_fdata()
+        try:
+            bounding_box_ED = regionprops(np.asarray(pred_ED > 0, dtype=int))[0].bbox
+            bounding_box_ES = regionprops(np.asarray(pred_ES > 0, dtype=int))[0].bbox
+        except:
+            bounding_box_ED = [-1, -1, -1, -1, -1, -1]
+            bounding_box_ES = [-1, -1, -1, -1, -1, -1]
+            print('Error in patient {}'.format(pat))
+        bounding_boxes_ED.append(bounding_box_ED)
+        bounding_boxes_ES.append(bounding_box_ES)
+
+    with open(Path(save_path).joinpath('boundingbox_ES.csv'), 'w') as out:
+        csv_out = csv.writer(out)
+        for idx, row in enumerate(bounding_boxes_ES):
+            csv_out.writerow([pat_list[idx]] + list(row))
+
+    with open(Path(save_path).joinpath('boundingbox_ED.csv'), 'w') as out:
+        csv_out = csv.writer(out)
+        for idx, row in enumerate(bounding_boxes_ED):
+            csv_out.writerow([pat_list[idx]] + list(row))
+
+    print('done bounding boxes')
+    #bounding_boxes_ES = np.asarray([list(x) for x in bounding_boxes_ES if x[0] > -1])
+    #bounding_boxes_ED = np.asarray([list(x) for x in bounding_boxes_ED if x[0] > -1])
+    #min_loc = np.min(np.concatenate((bounding_boxes_ES, bounding_boxes_ED), axis=0), axis=0)[0:2]  # min_row, min_col, min_slice, max_row, max_col, max_slice
+    #max_loc = np.max(np.concatenate((bounding_boxes_ES, bounding_boxes_ED), axis=0), axis=0)[3:5]
+    #print('Bounding box min {} to max {}'.format(min_loc, max_loc))
+    # bounding_boxes_ES = np.asarray([list(x) for x in bounding_boxes_ES if x[0] > -1])
+    # bounding_boxes_ED = np.asarray([list(x) for x in bounding_boxes_ED if x[0] > -1])
+    bounding_boxes_ES = np.asarray([list(x) for x in bounding_boxes_ES])
+    bounding_boxes_ED = np.asarray([list(x) for x in bounding_boxes_ED])
+    leave_out = np.any(bounding_boxes_ES < 0, axis=1)  # failed to create mask
+    bounding_boxes_ES = bounding_boxes_ES[~leave_out, :]
+    bounding_boxes_ED = bounding_boxes_ED[~leave_out, :]
+    pat_failed = pat_list[leave_out]
+    pat_list = pat_list[~leave_out]
+    crop_shapes_ES = bounding_boxes_ES[:, 3:6] - bounding_boxes_ES[:, 0:3]
+    crop_shapes_ED = bounding_boxes_ED[:, 3:6] - bounding_boxes_ED[:, 0:3]
+    for i in range(3):
+        plt.subplot(1, 3, i + 1)
+        plt.hist(crop_shapes_ED[:, i], np.unique(crop_shapes_ED[:, i]))
+    plt.show()
+    for i in range(3):
+        plt.subplot(1, 3, i + 1)
+        plt.hist(crop_shapes_ES[:, i], np.unique(crop_shapes_ES[:, i]))
+    plt.show()
+
+    leave_out = np.any(crop_shapes_ES[:, 0:2] < 5, axis=1) | np.any(crop_shapes_ED[:, 0:2] < 10, axis=1) | (
+                crop_shapes_ED[:, 2] < 5)  # minimum shape
+    pat_failed += pat_list[leave_out]
+    pat_list = pat_list[~leave_out]
+    crop_shapes_ES = crop_shapes_ES[~leave_out, :]
+    crop_shapes_ED = crop_shapes_ED[~leave_out, :]
+
+    min_shape = np.min(crop_shapes_ED, axis=0)
+    max_shape = np.max(crop_shapes_ED, axis=0)
+    per_shape = np.percentile(crop_shapes_ED, 99.5, axis=0)
+    median_shape = np.median(crop_shapes_ED, axis=0)
+    # min_loc = np.min(np.concatenate((bounding_boxes_ES, bounding_boxes_ED), axis=0), axis=0)[0:3]  # min_row, min_col, min_slice, max_row, max_col, max_slice
+    # max_loc = np.max(np.concatenate((bounding_boxes_ES, bounding_boxes_ED), axis=0), axis=0)[3:6]
+    # min_loc = min_loc[0:2] + np.array([-10, -10, 0])
+    # max_loc = max_loc[3:6] + np.array([10, 10, 0])
+
+
+def crop(x, s, c, shift_center=True):
+    # x: input data
+    # s: desired size
+    # c: center
+    # shift_center: shift the center of cropping so that the whole patch is inside the image (True), or symmetric-pad in case that patches extend beyond image borders (False)
+    if type(s) is not np.ndarray:
+        s = np.asarray(s, dtype='f')
+
+    if type(c) is not np.ndarray:
+        c = np.asarray(c, dtype='f')
+
+    if type(x) is not np.ndarray:
+        x = np.asarray(x, dtype='f')
+
+    m = np.asarray(np.shape(x), dtype='f')
+    if len(m) < len(s):
+        m = [m, np.ones(1, len(s) - len(m))]
+
+    if np.sum(m == s) == len(m):
+        return x
+
+    def get_limits(sin, cin):
+        if np.remainder(sin, 2) == 0:
+            lower = cin + 1 + np.ceil(-sin / 2) - 1
+            upper = cin + np.ceil(sin / 2)
+        else:
+            lower = cin + np.ceil(-sin / 2) - 1
+            upper = cin + np.ceil(sin / 2) - 1
+        return lower, upper
+
+    idx = list()
+    idx_pad = ()
+    for n in range(np.size(s)):
+        #if np.remainder(s[n], 2) == 0:
+        #    lower = c[n] + 1 + np.ceil(-s[n] / 2) - 1
+        #    upper = c[n] + np.ceil(s[n] / 2)
+        #else:
+        #    lower = c[n] + np.ceil(-s[n] / 2) - 1
+        #    upper = c[n] + np.ceil(s[n] / 2) - 1
+        lower, upper = get_limits(s[n], c[n])
+
+        # shift center
+        if shift_center:
+            if lower < 0:
+                c[n] += np.abs(lower)
+
+            if upper > m[n]:
+                c[n] -= np.abs(upper - m[n])
+
+            lower, upper = get_limits(s[n], c[n])
+
+        # if even shifting the center is not helping, pad data
+        if lower < 0:
+            low_pad = int(np.abs(lower))
+            lower = 0
+            upper = s[n]
+        else:
+            low_pad = 0
+
+        if upper > m[n]:
+            upper_pad = int(np.abs(upper - m[n]))
+            upper = m[n]
+            lower = m[n] - s[n]
+        else:
+            upper_pad = 0
+
+        idx.append(list(np.arange(lower, upper, dtype=int)))
+        idx_pad += (low_pad, upper_pad),
+
+    index_arrays = np.ix_(*idx)
+    x = np.pad(x, idx_pad, mode='symmetric')
+    return x[index_arrays]
+
+
+def write_keys(input_dir, output_dir, output_file, verbose=False):
+    # Create output directory if it does not exist
+    output_dir.mkdir(exist_ok=True)
+
+    if os.path.exists(output_dir.joinpath('keys', 'all.dat')):
+        print('keys already exists')
+        #return pickle.load(open(output_dir.joinpath('keys', 'all.dat'), 'r'))
+        return [l.strip() for l in output_dir.joinpath('keys', 'all.dat').open().readlines()]
+
+    # Get list of all nifti files in input_dir
+    nifti_files = [f for f in input_dir.glob('*.nii.gz')]
+
+    keys = []
+    for nifti_file in tqdm(nifti_files):
+        keyh5 = nifti_file.stem.split('.')[0]
+        key = keyh5.split('_')[0]
+        keys.append(key)
+
+    keys = list(set(keys))  # remove duplicates of "*_2" and "*_3", revisits of patients?
+    with open(output_dir.joinpath('keys', 'all.dat'), 'w') as f:  # interim_8000 was written and read as binary: "wb" / "rb" (above)
+        #pickle.dump(keys, f)
+        for key in keys:
+            f.write(key + '\n')
+
+    return keys
+
+
+def convert_nifti_h5(input_dir, output_dir, output_file, save_path, single_file=True, df_redo=None, verbose=False):
+    # Create output directory if it does not exist
+    output_dir.mkdir(exist_ok=True)
+
+    # Get list of all nifti files in input_dir
+    nifti_files = [f for f in input_dir.glob('*.nii.gz')]
+
+    if df_redo is not None:
+        nifti_files = [f for f in nifti_files if '_'.join(f.stem.split('.')[0].split('_')[0:2]) in df_redo['keys'].tolist()]
+        print('Redoing {} nifti files'.format(len(nifti_files)))
+
+    # Create list of all h5 files in output_dir
+    if single_file:
+        h5_file = output_dir.joinpath(output_file)
+    else:
+        h5_dir = output_dir.joinpath(Path(output_file).stem)
+        h5_dir.mkdir(exist_ok=True)
+
+    # Save path for segmentation masks
+    bounding_boxes_ED = []
+    pat_list = []
+    with open(Path(save_path).joinpath('boundingbox_ED.csv'), 'r') as out:
+        csv_reader = csv.reader(out)
+        for row in csv_reader:
+            pat_list.append(row[0])
+            bounding_boxes_ED.append(row[1:])
+
+    bounding_boxes_ES = []
+    with open(Path(save_path).joinpath('boundingbox_ES.csv'), 'r') as out:
+        csv_reader = csv.reader(out)
+        for row in csv_reader:
+            bounding_boxes_ES.append(row[1:])
+
+    sel_shape = [72, 76, 8]
+    print('Extracted cardiac shapes: {}'.format(sel_shape))
+
+    keys = []
+    plot_path = Path(save_path).parent.joinpath('qualicheck')
+
+    def process_file(nifti_file):
+        file_key = nifti_file.stem.split('.')[0]
+        keyh5 = file_key.split('_')[0]
+
+        if not single_file and h5_dir.joinpath(file_key + '_sa.h5').exists():
+            if h5py.File(h5_dir.joinpath(file_key + '_sa.h5'), 'r')['image/' + f'{file_key}' + '_sa'].shape[0:2] == sel_shape[0:2]:
+                return
+        try: 
+            img = nib.load(nifti_file)
+            img_data = img.get_fdata().astype(np.float32)
+            affine = img.affine.astype(np.float16)
+        except Exception as e:
+            print('------------')
+            print(f'subject {nifti_file} failed to load')
+            print('------------')
+            print(e)
+            return
+
+        # find patient
+        if not file_key[:-3] in pat_list:
+            print('Patient mask extraction failed: ' + file_key)
+            return
+        box = bounding_boxes_ED[pat_list.index(file_key[:-3])]
+        center = list(np.floor((np.asarray(box[0:3], dtype='int') + np.asarray(box[3:6], dtype='int')) / 2)) + [
+            np.floor(np.shape(img_data)[3] / 2)]
+        center = [int(x) for x in center]
+
+        # list(box[0:2] + np.floor(np.asarry(sel_shape[0:2]) / 2)) + list(np.floor(np.asarry(box[5] + box[2])/2)) +
+
+        # crop image around segmentation mask
+        img_crop = crop(img_data, sel_shape + [np.shape(img_data)[3]], center)
+
+        #save_path_curr = Path(save_path).joinpath(key + file_key.split('_')[1])
+        #Path(save_path_curr).mkdir(exist_ok=True)
+
+        # Write to h5 file
+        if single_file:
+            grp_image.create_dataset(keyh5, data=img_crop)
+            grp_affine.create_dataset(keyh5, data=affine)
+        else:
+            if h5_dir.joinpath(keyh5 + '_sa.h5').exists():
+                Path(h5_dir.joinpath(keyh5 + '_sa.h5')).unlink()
+            h5file = h5py.File(h5_dir.joinpath(keyh5 + '.h5'), 'w')
+            grps_image = h5file.create_group('image')
+            grps_affine = h5file.create_group('affine')
+            grps_image.create_dataset(keyh5, data=img_crop)
+            grps_affine.create_dataset(keyh5, data=affine)
+
+        # Quality check
+        # plt.imshow(img_crop[:, :, int(np.floor(np.shape(img_crop)[2]/2)), 0])
+        # plt.savefig(plot_path.joinpath(keyh5 + '.png'))
+
+    if single_file:
+        hf = h5py.File(h5_file, 'w')
+        grp_image = hf.create_group('image')
+        grp_affine = hf.create_group('affine')
+        for nifti_file in tqdm(nifti_files):
+            process_file(nifti_file)
+    else:
+        num_cores = 10
+        print(f'using {num_cores} CPU cores')
+
+        t = time.time()
+        results = Parallel(n_jobs=num_cores)(
+            delayed(process_file)(f) for f in tqdm(nifti_files))
+        elapsed_time = time.time() - t
+
+        print(f'elapsed time: {time.strftime("%H:%M:%S", time.gmtime(elapsed_time))}')
+
+def merge_hdf5(input_dir, output_dir, output_file):
+    pats = os.listdir(input_dir)
+    hdf5file = h5py.File(Path(output_dir).joinpath(output_file), 'w')
+    #grp_image = hdf5file.create_group('image')
+
+    for pat in pats:
+        keyh5 = "_".join(pat.split('_')[0:2])
+        hdf5file["/image/" + keyh5] = h5py.ExternalLink(Path(input_dir).joinpath(pat), "/image/" + keyh5 + '_sa')
+    hdf5file.close()
+
+def parse_hdf5(input_dir, output_dir, output_file, info='/mnt/qdata/share/rakuest1/data/UKB/interim/ukb_all.csv',
+               train_set='/mnt/qdata/share/rakuest1/data/UKB/interim/keys/train_imaging.dat',
+               val_set='/mnt/qdata/share/rakuest1/data/UKB/interim/keys/test.dat',
+               group='image'):
+    hdf5file = h5py.File(Path(output_dir).joinpath(output_file), 'r')
+    #info_df = pd.read_csv(info, index_col=0, usecols=[1, 2, 3, 4, 5], dtype={'key': 'string', column: np.float32})
+    train_keys = [l.strip() for l in Path(train_set).open().readlines()]
+    val_keys = [l.strip() for l in Path(val_set).open().readlines()]
+    all_keys = train_keys + val_keys
+    datlist = get_shapes(hdf5file, input_dir, all_keys, group)
+    #d = {'keys': key_proc, 'h5size': shapes_h5, 'niisize': shapes_nii}
+    df = pd.DataFrame(datlist)
+    df.to_csv(output_dir.joinpath('ukb_heart_sizes.csv'))
+    print('Done with shapes')
+
+def get_shapes(hdf5file, input_dir, keys, group):
+    keys = [l.strip() for l in Path(keys).open().readlines()] if isinstance(keys, str) else keys
+    #shapes_h5 = list()
+    #shapes_nii = list()
+    #key_proc = list()
+    datlist = list()
+    #for key in tqdm(keys):
+    def get_shape_inner(key):
+        group_str = group + '/' if group else ''
+
+        for idx in [2, 3]:
+            keyh5 = key + '_' + str(idx)
+            # if Path(self.datapath).joinpath(keyh5 + '_sa.h5').exists():
+            if f'{group_str}{keyh5}' in hdf5file:
+                break
+            else:
+                keyh5 = ''
+
+        shape_h5 = hdf5file[f'{group_str}{keyh5}'].shape
+        #shapes_h5.append(np.shape(data))
+        shape_nii = nib.load(input_dir.joinpath(keyh5 + '_sa.nii.gz')).shape
+        #shapes_nii.append(img.shape)
+        #key_proc.append(keyh5)
+        sample = {'keys': keyh5, 'h5size': shape_h5, 'niisize': shape_nii}
+        #datlist.append(sample)
+        return sample
+        #return np.shape(data), img.shape
+
+    num_cores = 1
+    print(f'using {num_cores} CPU cores')
+
+    t = time.time()
+    #_ = Parallel(n_jobs=num_cores, backend='threading')(
+    #    delayed(get_shape_inner)(f) for f in tqdm(keys))
+    for f in tqdm(keys):
+        sample = get_shape_inner(f)
+        datlist.append(sample)
+    elapsed_time = time.time() - t
+
+    print(f'elapsed time: {time.strftime("%H:%M:%S", time.gmtime(elapsed_time))}')
+    return datlist
+
+def main():
+    parser = argparse.ArgumentParser(description='Preprocessing pipeline for UK Biobank SA Heart MRI data.\n' \
+                                                 'CSV creation\n' \
+                                                 'Nifti to HDF5 conversion\n' \
+                                                 'Key creation for train, test, val')
+    parser.add_argument('input_dir', help='Input directory of all nifti files (*.nii.gz)')
+    parser.add_argument('output_dir', help='Output directory for all files',
+                        default='/mnt/qdata/share/raeckev1/nako_30k/interim/')
+    parser.add_argument('--output_file', help='Output h5 file to store processed files.',
+                        default='nako_heart_preprocessed.h5')
+    parser.add_argument('--csv_input', help='Input CSV file',
+                        default='/mnt/qdata/rawdata/UKBIOBANK/baskets/4053862/ukb677731.csv')
+    parser.add_argument('--csv_output', help='Output CSV file', default='nako_brain.csv')
+    parser.add_argument('-v', '--verbose', action='store_true')
+    args = parser.parse_args()
+
+    #data_path = '/mnt/qdata/share/rakuest1/data/UKB/raw/sa_heart/raw'
+    save_path = '/mnt/qdata/share/raeckev1/nako_30k/sa_heart/processed/seg'  # for segmentations
+    Path(save_path).mkdir(parents=True, exist_ok=True)
+
+    input_dir = Path(args.input_dir)
+    output_dir = Path(args.output_dir)
+
+    # run segmentation on whole cohort first to get shapes of segmentation masks
+    nifti_files = [f for f in Path(input_dir).glob('*.nii.gz')]
+    #print(nifti_files.index(Path('/mnt/qdata/share/raecker1/ukbdata_70k/sa_heart/raw/4681366_2_sa.nii.gz')))
+    #print(nifti_files.index(Path('/mnt/qdata/share/raecker1/ukbdata_70k/sa_heart/raw/4682757_2_sa.nii.gz')))
+    #print(nifti_files.index(Path('/mnt/qdata/share/raecker1/ukbdata_70k/sa_heart/raw/4676659_2_sa.nii.gz')))
+    #nifti_files = nifti_files[nifti_files.index(Path('/mnt/qdata/share/raecker1/ukbdata_70k/sa_heart/raw/4676659_2_sa.nii.gz'))+1:]
+    #nifti_files = nifti_files[nifti_files.index(Path('/mnt/qdata/share/raecker1/ukbdata_70k/sa_heart/raw/4637290_2_sa.nii.gz')):]
+    #print(f'segmenting {len(nifti_files)} images')
+    #segment_heart(nifti_files, save_path=save_path)
+    #get_bounding_boxes(save_path)
+    #convert_nifti_h5(input_dir, output_dir, args.output_file, save_path, single_file=True, verbose=False)
+    #merge_hdf5(input_dir, output_dir, args.output_file)
+    #parse_hdf5(input_dir, output_dir, args.output_file)
+    #df = pd.read_csv('/mnt/qdata/share/rakuest1/data/UKB/interim/ukb_heart_sizes.csv')
+    #df_redo = df.copy()
+    #df_redo = df_redo.loc[df_redo['h5size'] != '(72, 76, 8, 50)']
+    #df_redo['h5size'] = df_redo['h5size'].apply(lambda x: np.fromstring(x.replace('(', '').replace(')', ''), dtype=int, sep=","))
+    #df_redo['idx'] = df_redo['h5size'].apply(lambda x: np.all(x != np.asarray([72, 76, 8, 50])))
+    #df_redo = df_redo.loc[df_redo['idx'] == True]
+    convert_nifti_h5(input_dir, output_dir, args.output_file, save_path, single_file=True, df_redo=None, verbose=False)
+
+if __name__ == '__main__':
+    main()
+

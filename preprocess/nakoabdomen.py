@@ -20,8 +20,9 @@ import pandas as pd
 from tqdm import tqdm
 import numpy as np
 from sklearn.model_selection import train_test_split, KFold
-from skimage.measure import label, regionprops
-from ukbheart import crop
+from skimage.measure import regionprops
+from scipy.ndimage import label
+from nakoheart import crop
 import ast
 import matplotlib.pyplot as plt
 from joblib import Parallel, delayed
@@ -149,31 +150,294 @@ def inspect_boxes_segmentation(input_dir, output_dir, output_file, save_path, ve
     plt.show()
 
 
-def update_h5_links(file_path):
+def convert_nifti_h5_masked_parallel(input_dir, output_dir, output_file, save_path, parallelize, verbose=False):
     """
-    Update external links in an HDF5 file by replacing 'ukb' with 'nako'.
-    
-    Parameters:
-    - file_path: Path to the HDF5 file
+    Converts all nifti files in input_dir to h5 files in output_dir
     """
-    with h5py.File(file_path, 'r+') as hdf:
-        def recursively_update_links(group):
-            for key in group.keys():
-                item = group[key]
-                if isinstance(item, h5py.ExternalLink):
-                    # Get the current link path
-                    link_path = item.filename
-                    # Replace 'ukb' with 'nako'
-                    new_link_path = link_path.replace('ukb', 'nako')
-                    # Update the external link
-                    group[key] = h5py.ExternalLink(new_link_path, item.path)
-                elif isinstance(item, h5py.Group):
-                    # Recursively update links in sub-groups
-                    recursively_update_links(item)
-        
-        # Start updating links from the root group
-        recursively_update_links(hdf)
 
+    # Create output directory if it does not exist
+    output_dir.mkdir(exist_ok=True)
+    bounding_boxes = pd.read_csv(Path(save_path).joinpath('bounding_boxes_abdomen_largest_component_parallel.csv'))
+    bounding_boxes_rem = bounding_boxes.loc[(bounding_boxes['liv'] != '[-1, -1, -1, -1, -1, -1]') &
+                                            (bounding_boxes['spl'] != '[-1, -1, -1, -1, -1, -1]') &
+                                            (bounding_boxes['rkd'] != '[-1, -1, -1, -1, -1, -1]') &
+                                            (bounding_boxes['lkd'] != '[-1, -1, -1, -1, -1, -1]') &
+                                            (bounding_boxes['pnc'] != '[-1, -1, -1, -1, -1, -1]')]
+
+    pats = list(bounding_boxes_rem['pat'].values)
+    pats = [str(k) for k in pats]
+    pats = ['123585']
+
+    sel_shape = {'liv': [185, 150, 70], 'spl': [80, 80, 50], 'rkd': [60, 60, 50], 'lkd': [60, 60, 50], 'pnc': [120, 70, 70]}     #nako
+    contrasts = ['fat', 'in', 'opp', 'water']
+
+    keys = []
+    files = ['nako_liv_preprocessed_masked.h5', 'nako_spl_preprocessed_masked.h5', 'nako_rkd_preprocessed_masked.h5', 'nako_lkd_preprocessed_masked.h5', 'nako_pnc_preprocessed_masked.h5']
+
+    for idx, file in enumerate(files):
+        output_dir.joinpath(Path(file).stem).mkdir(exist_ok=True)   # create nako_xxx_preprocessed dir
+
+    def process_file(pat, parallelize):
+        for contrast in contrasts:
+            # check existence in file
+            exists_all = []
+            for iclass in np.arange(1, 6):
+                if iclass == 1: class_name = 'liv'
+                elif iclass == 2: class_name = 'spl'
+                elif iclass == 3: class_name = 'rkd'
+                elif iclass == 4: class_name = 'lkd'
+                elif iclass == 5: class_name = 'pnc'
+                else: raise ValueError('Class not recognized')
+                if output_dir.joinpath(Path(files[iclass-1]).stem, contrast + '_' + pat + '.h5').exists(): # checks if files (4 contrasts) for pat exist in ukb_xxx_preprocessed dir
+                    exists_all.append(True)
+                else:
+                    exists_all.append(False)
+            
+            if np.all(exists_all):
+                #print(files[iclass-1] + ': ' + contrast + '_' + pat + '.h5 already exists')
+                continue            
+            try:
+                if not os.path.exists(input_dir.joinpath(pat)):
+                    fname = pat + '_30'
+                else:
+                    fname = pat
+                if os.path.isdir(input_dir.joinpath(fname, contrast)):
+                    nifti_file = input_dir.joinpath(fname, contrast, contrast + '.nii.gz')
+                else:
+                    nifti_file = input_dir.joinpath(fname, contrast + '.nii.gz')
+                img = nib.load(nifti_file)
+                img_data = img.get_fdata().astype(np.float32)
+                affine = img.affine.astype(np.float16)
+                if not os.path.exists(save_path.joinpath(pat)):
+                    mname = pat + '_30'
+                else:
+                    mname = pat
+                mask = nib.load(save_path.joinpath(mname, 'prd.nii.gz'))
+                mask_data = mask.get_fdata().astype(np.float32)
+            except Exception as exc:
+                print(exc)
+                print('Error in pat:' + str(pat))
+                return
+
+            for iclass in np.arange(1, 6):
+                if iclass == 1: class_name = 'liv'
+                elif iclass == 2: class_name = 'spl'
+                elif iclass == 3: class_name = 'rkd'
+                elif iclass == 4: class_name = 'lkd'
+                elif iclass == 5: class_name = 'pnc'
+                else: raise ValueError('Class not recognized')
+
+                img_mask = np.where(mask_data == iclass, 1, 0)
+
+                sel_shape_curr = sel_shape[class_name]
+                box = bounding_boxes.loc[bounding_boxes['pat'] == int(pat)][class_name].values
+                box = np.asarray([list(ast.literal_eval(l)) for l in box])[0]
+                center = list(np.floor((box[0:3] + box[3:6]) / 2))  # + [np.floor(np.shape(img_data)[2] / 2)]
+                center = [int(x) for x in center]
+                
+                img_crop = crop(img_data, sel_shape_curr, center)   # crop image around segmentation mask
+                mask_crop = crop(img_mask, sel_shape_curr, center)
+                img_crop = img_crop * mask_crop
+
+                file_curr = output_dir.joinpath(Path(files[iclass-1]).stem, contrast + '_' + pat + '.h5')
+                with h5py.File(file_curr, 'w') as hfcurr:
+                    hfcurr.create_dataset('image', data=img_crop)   # create contrast_pat.h5 file in ukb_xxx_preprocessed dir
+
+                if iclass == 1 and contrast == 'fat':
+                    file_curr = output_dir.joinpath(Path(files[iclass - 1]).stem, 'affine_' + pat + '.h5')
+                    with h5py.File(file_curr, 'w') as hfcurr:
+                        hfcurr.create_dataset('affine', data=affine)
+
+    num_cores = 1
+    print(f'using {num_cores} CPU cores')
+
+    t = time.time()
+    _ = Parallel(n_jobs=num_cores)(
+        delayed(process_file)(f, parallelize) for f in tqdm(pats))
+    elapsed_time = time.time() - t
+
+    print(f'elapsed time: {time.strftime("%H:%M:%S", time.gmtime(elapsed_time))}')
+
+    return keys
+
+
+def convert_nifti_h5_masked(input_dir, output_dir, output_file, save_path, parallelize, verbose=False):
+    """
+    Converts all nifti files in input_dir to h5 files in output_dir
+    """
+
+    # Create output directory if it does not exist
+    output_dir.mkdir(exist_ok=True)
+
+    # Get list of all nifti files in input_dir
+    #pats = input_dir.glob('*')
+    bounding_boxes = pd.read_csv(Path(save_path).joinpath('bounding_boxes_abdomen_largest_component_parallel.csv'))
+    bounding_boxes_rem = bounding_boxes.loc[(bounding_boxes['liv'] != '[-1, -1, -1, -1, -1, -1]') &
+                                            (bounding_boxes['spl'] != '[-1, -1, -1, -1, -1, -1]') &
+                                            (bounding_boxes['rkd'] != '[-1, -1, -1, -1, -1, -1]') &
+                                            (bounding_boxes['lkd'] != '[-1, -1, -1, -1, -1, -1]') &
+                                            (bounding_boxes['pnc'] != '[-1, -1, -1, -1, -1, -1]')]
+
+    pats = list(bounding_boxes_rem['pat'].values)
+    pats = [str(k) for k in pats]
+
+    #sel_shape = {'liv': [120, 100, 70], 'spl': [60, 60, 50], 'rkd': [40, 40, 50], 'lkd': [40, 40, 50], 'pnc': [80, 50, 50]}    #ukb
+    sel_shape = {'liv': [185, 150, 70], 'spl': [80, 80, 50], 'rkd': [60, 60, 50], 'lkd': [60, 60, 50], 'pnc': [120, 70, 70]}     #nako
+
+    contrasts = ['fat', 'in', 'opp', 'water']
+
+    keys = []
+    files = ['nako_liv_preprocessed_masked.h5', 'nako_spl_preprocessed_masked.h5', 'nako_rkd_preprocessed_masked.h5', 'nako_lkd_preprocessed_masked.h5', 'nako_pnc_preprocessed_masked.h5']
+    modes = ['w', 'w', 'w', 'w', 'w']
+    for idx, file in enumerate(files):
+        if output_dir.joinpath(file).exists():
+            Path(output_dir.joinpath(file)).unlink()    # remove existing ukb_xxx_preprocessed.h5 file
+            #modes[idx] = 'a'
+        output_dir.joinpath(Path(file).stem).mkdir(exist_ok=True)   # create ukb_xxx_preprocessed dir
+
+    hfs = {'liv': h5py.File(output_dir.joinpath('nako_liv_preprocessed_masked.h5'), modes[0]),
+           'spl': h5py.File(output_dir.joinpath('nako_spl_preprocessed_masked.h5'), modes[1]),
+           'rkd': h5py.File(output_dir.joinpath('nako_rkd_preprocessed_masked.h5'), modes[2]),
+           'lkd': h5py.File(output_dir.joinpath('nako_lkd_preprocessed_masked.h5'), modes[3]),
+           'pnc': h5py.File(output_dir.joinpath('nako_pnc_preprocessed_masked.h5'), modes[4])}
+
+    #for pat in tqdm(pats):
+    def process_file(pat, parallelize):
+        #if pat.name not in patsseg:
+        #    continue
+        for contrast in contrasts:
+            # check existence in file
+            exists_all = []
+            for iclass in np.arange(1, 6):
+                if iclass == 1:
+                    class_name = 'liv'
+                elif iclass == 2:
+                    class_name = 'spl'
+                elif iclass == 3:
+                    class_name = 'rkd'
+                elif iclass == 4:
+                    class_name = 'lkd'
+                elif iclass == 5:
+                    class_name = 'pnc'
+                else:
+                    raise ValueError('Class not recognized')
+                #if modes[iclass-1] == 'a' and contrast + '/' + pat in hfs[class_name]:
+                if output_dir.joinpath(Path(files[iclass-1]).stem, contrast + '_' + pat + '.h5').exists(): # checks if files (4 contrasts) for pat exist in ukb_xxx_preprocessed dir
+                    exists_all.append(True)
+                else:
+                    exists_all.append(False)
+            
+            if np.all(exists_all):
+                doload = False
+            else:
+                doload = True
+
+            if doload:  # load nifti files only if not yet in ukb_xxx_preprocessed dir
+                if not os.path.exists(input_dir.joinpath(pat)):
+                    fname = pat + '_30'
+                else:
+                    fname = pat
+                if os.path.isdir(input_dir.joinpath(fname, contrast)):
+                    nifti_file = input_dir.joinpath(fname, contrast, contrast + '.nii.gz')
+                else:
+                    nifti_file = input_dir.joinpath(fname, contrast + '.nii.gz')
+                img = nib.load(nifti_file)
+                img_data = img.get_fdata().astype(np.float32)
+                affine = img.affine.astype(np.float16)
+                keyh5 = nifti_file.stem.split('.')[0]
+                if not os.path.exists(save_path.joinpath(pat)):
+                    mname = pat + '_30'
+                else:
+                    mname = pat
+                mask = nib.load(save_path.joinpath(mname, 'prd.nii.gz'))
+                mask_data = mask.get_fdata().astype(np.float32)
+
+
+            for iclass in np.arange(1, 6):
+                #if exists_all[iclass-1]:
+                #    continue
+                if iclass == 1:
+                    class_name = 'liv'
+                elif iclass == 2:
+                    class_name = 'spl'
+                elif iclass == 3:
+                    class_name = 'rkd'
+                elif iclass == 4:
+                    class_name = 'lkd'
+                elif iclass == 5:
+                    class_name = 'pnc'
+                else:
+                    raise ValueError('Class not recognized')
+                if exists_all[iclass-1]:     
+                    # link pats in ukb_xxx_preprocessed.h5 if files for pat already exist in ukb_xxx_preprocessed dir
+                    file_curr = output_dir.joinpath(Path(files[iclass - 1]).stem, contrast + '_' + pat + '.h5')
+                    if not parallelize:
+                        hfs[class_name][contrast + '/' + pat] = h5py.ExternalLink(file_curr, "/image")
+                    if iclass == 1 and contrast == 'fat':
+                        file_curr = output_dir.joinpath(Path(files[iclass - 1]).stem, 'affine_' + pat + '.h5')
+                        if not parallelize:
+                            hfs[class_name]['affine/' + pat] = h5py.ExternalLink(file_curr, "/affine")
+                    continue
+
+                img_mask = np.where(mask_data == iclass, 1, 0)
+
+                sel_shape_curr = sel_shape[class_name]
+
+                box = bounding_boxes.loc[bounding_boxes['pat'] == int(pat)][class_name].values
+                box = np.asarray([list(ast.literal_eval(l)) for l in box])[0]
+                center = list(np.floor((box[0:3] + box[3:6]) / 2))  # + [np.floor(np.shape(img_data)[2] / 2)]
+                center = [int(x) for x in center]
+
+                # list(box[0:2] + np.floor(np.asarry(sel_shape[0:2]) / 2)) + list(np.floor(np.asarry(box[5] + box[2])/2)) +
+
+                # crop image around segmentation mask
+                img_crop = crop(img_data, sel_shape_curr, center)
+                mask_crop = crop(img_mask, sel_shape_curr, center)
+                img_crop = img_crop * mask_crop
+
+                #save_path_curr = Path(save_path).joinpath(key + keyh5.split('_')[1])
+                #Path(save_path_curr).mkdir(exist_ok=True)
+
+                # Write to h5 file
+                #hfs[class_name].create_dataset(contrast + '/' + pat, data=img_crop)
+                #if iclass == 1 and contrast == 'fat':
+                #    hfs[class_name].create_dataset('affine/' + pat, data=affine)
+                file_curr = output_dir.joinpath(Path(files[iclass-1]).stem, contrast + '_' + pat + '.h5')
+                with h5py.File(file_curr, 'w') as hfcurr:
+                    hfcurr.create_dataset('image', data=img_crop)   # create contrast_pat.h5 file in ukb_xxx_preprocessed dir
+                if not parallelize:
+                    hfs[class_name][contrast + '/' + pat] = h5py.ExternalLink(file_curr, "/image")   # link contrast_pat.h5 file to ukb_xxx_preprocessed.h5
+
+                if iclass == 1 and contrast == 'fat':
+                    file_curr = output_dir.joinpath(Path(files[iclass - 1]).stem, 'affine_' + pat + '.h5')
+                    with h5py.File(file_curr, 'w') as hfcurr:
+                        hfcurr.create_dataset('affine', data=affine)
+                    if not parallelize:
+                        hfs[class_name]['affine/' + pat] = h5py.ExternalLink(file_curr, "/affine")
+
+    if parallelize:
+        num_cores = 24
+        print(f'using {num_cores} CPU cores')
+
+        t = time.time()
+        _ = Parallel(n_jobs=num_cores)(
+            delayed(process_file)(f, parallelize) for f in tqdm(pats))
+        elapsed_time = time.time() - t
+
+        print(f'elapsed time: {time.strftime("%H:%M:%S", time.gmtime(elapsed_time))}')
+
+        # now link the files to the main hdf5 file
+        for pat in tqdm(pats):
+            process_file(pat, False)
+
+    else:
+        for pat in tqdm(pats):
+            process_file(pat, parallelize)
+
+    for hf in hfs:
+        hf.close()
+
+    return keys
 
 
 def convert_nifti_h5(input_dir, output_dir, output_file, save_path, parallelize, verbose=False):
@@ -185,8 +449,7 @@ def convert_nifti_h5(input_dir, output_dir, output_file, save_path, parallelize,
     output_dir.mkdir(exist_ok=True)
 
     # Get list of all nifti files in input_dir
-    #pats = input_dir.glob('*')
-    bounding_boxes = pd.read_csv(Path(save_path).joinpath('bounding_boxes_abdomen.csv'))
+    bounding_boxes = pd.read_csv(Path(save_path).joinpath('bounding_boxes_abdomen_largest_component_parallel.csv'))
     bounding_boxes_rem = bounding_boxes.loc[(bounding_boxes['liv'] != '[-1, -1, -1, -1, -1, -1]') &
                                             (bounding_boxes['spl'] != '[-1, -1, -1, -1, -1, -1]') &
                                             (bounding_boxes['rkd'] != '[-1, -1, -1, -1, -1, -1]') &
@@ -195,19 +458,14 @@ def convert_nifti_h5(input_dir, output_dir, output_file, save_path, parallelize,
     #patsseg = list(bounding_boxes_rem['pat'].values)
     pats = list(bounding_boxes_rem['pat'].values)
     pats = [str(k) for k in pats]
-    pats = [pat[:6] + '_' + pat[6:] if len(pat) == 8 else pat for pat in pats]
+    #pats = [pat[:6] + '_' + pat[6:] if len(pat) == 8 else pat for pat in pats]
 
     # Create list of all h5 files in output_dir
     #h5_file = output_dir.joinpath(output_file)
 
-    #if os.path.exists(h5_file):
-    #    print('{} already exists'.format(h5_file))
-    #    #return pickle.load(open(output_dir.joinpath('keys', 'all.dat'), 'r'))
-    #    return [l.strip() for l in output_dir.joinpath('keys', 'all.dat').open().readlines()]
-
-    sel_shape = {'liv': [120, 100, 70], 'spl': [60, 60, 50], 'rkd': [40, 40, 50], 'lkd': [40, 40, 50], 'pnc': [80, 50, 50]}
+    #sel_shape = {'liv': [120, 100, 70], 'spl': [60, 60, 50], 'rkd': [40, 40, 50], 'lkd': [40, 40, 50], 'pnc': [80, 50, 50]}    #ukb
+    sel_shape = {'liv': [185, 150, 70], 'spl': [80, 80, 50], 'rkd': [60, 60, 50], 'lkd': [60, 60, 50], 'pnc': [120, 70, 70]}     #nako
     contrasts = ['fat', 'in', 'opp', 'water']
-    #bounding_boxes = pd.read_csv(Path(save_path).joinpath('bounding_boxes_abdomen.csv'))
 
     keys = []
     files = ['nako_liv_preprocessed.h5', 'nako_spl_preprocessed.h5', 'nako_rkd_preprocessed.h5', 'nako_lkd_preprocessed.h5', 'nako_pnc_preprocessed.h5']
@@ -223,16 +481,15 @@ def convert_nifti_h5(input_dir, output_dir, output_file, save_path, parallelize,
            'rkd': h5py.File(output_dir.joinpath('nako_rkd_preprocessed.h5'), modes[2]),
            'lkd': h5py.File(output_dir.joinpath('nako_lkd_preprocessed.h5'), modes[3]),
            'pnc': h5py.File(output_dir.joinpath('nako_pnc_preprocessed.h5'), modes[4])}
+    #hfs = {'liv': h5py.File(output_dir.joinpath('nako_liv_preprocessed.h5'), modes[0])}
 
-    #for pat in tqdm(pats):
     def process_file(pat, parallelize):
-        #if pat.name not in patsseg:
-        #    continue
-        print(pat)
+        #print(pat)
         for contrast in contrasts:
             # check existence in file
             exists_all = []
             for iclass in np.arange(1, 6):
+            #for iclass in [1]:          # only liver TODO: change back  
                 if iclass == 1:
                     class_name = 'liv'
                 elif iclass == 2:
@@ -256,16 +513,22 @@ def convert_nifti_h5(input_dir, output_dir, output_file, save_path, parallelize,
                 doload = True
 
             if doload:
-                if os.path.isdir(input_dir.joinpath(pat, contrast)):
-                    nifti_file = input_dir.joinpath(pat, contrast, contrast + '.nii.gz')
+                if not os.path.exists(input_dir.joinpath(pat)):
+                    fname = pat + '_30'
                 else:
-                    nifti_file = input_dir.joinpath(pat, contrast + '.nii.gz')
+                    fname = pat
+                if os.path.isdir(input_dir.joinpath(fname, contrast)):
+                    nifti_file = input_dir.joinpath(fname, contrast, contrast + '.nii.gz')
+                else:
+                    nifti_file = input_dir.joinpath(fname, contrast + '.nii.gz')
+                #print(f'loading {nifti_file}')
                 img = nib.load(nifti_file)
                 img_data = img.get_fdata().astype(np.float32)
                 affine = img.affine.astype(np.float16)
                 keyh5 = nifti_file.stem.split('.')[0]
 
             for iclass in np.arange(1, 6):
+            #for iclass in [1]:          # only liver TODO: change back
                 #if exists_all[iclass-1]:
                 #    continue
                 if iclass == 1:
@@ -324,7 +587,7 @@ def convert_nifti_h5(input_dir, output_dir, output_file, save_path, parallelize,
                         hfs[class_name]['affine/' + pat] = h5py.ExternalLink(file_curr, "/affine")
 
     if parallelize:
-        num_cores = 8
+        num_cores = 24
         print(f'using {num_cores} CPU cores')
 
         t = time.time()
@@ -349,21 +612,14 @@ def convert_nifti_h5(input_dir, output_dir, output_file, save_path, parallelize,
 
 
 def combine_kidney_h5(input_dir, output_dir, output_file, save_path, verbose=False):
-    bounding_boxes = pd.read_csv(Path(save_path).joinpath('bounding_boxes_abdomen.csv'))
-    bounding_boxes_rem = bounding_boxes.loc[(bounding_boxes['liv'] != '[-1, -1, -1, -1, -1, -1]') &
-                                            (bounding_boxes['spl'] != '[-1, -1, -1, -1, -1, -1]') &
-                                            (bounding_boxes['rkd'] != '[-1, -1, -1, -1, -1, -1]') &
-                                            (bounding_boxes['lkd'] != '[-1, -1, -1, -1, -1, -1]') &
-                                            (bounding_boxes['pnc'] != '[-1, -1, -1, -1, -1, -1]')]
-    #pats = list(bounding_boxes_rem['pat'].values)
-    #pats = [str(k) for k in pats]
-    hdf5file_lkd = h5py.File(Path(output_dir).joinpath('nako_lkd_preprocessed.h5'), 'r')
+    # Combine left and right kidney h5 files
+    hdf5file_lkd = h5py.File(Path(output_dir).joinpath('nako_lkd_preprocessed_masked.h5'), 'r')
     pats = list(hdf5file_lkd['water'].keys())
     print(pats[:5])
 
     # grp_image = hdf5file.create_group('image')
 
-    keys_kidney_train = [l.strip() for l in Path(output_dir).joinpath('keys', 'train_kidneys_mainly_healthy.dat').open().readlines()]
+    """keys_kidney_train = [l.strip() for l in Path(output_dir).joinpath('keys', 'train_kidneys_mainly_healthy.dat').open().readlines()]
     keys_kidney_train = [k + '/left' for k in keys_kidney_train] + [k + '/right' for k in keys_kidney_train]
     with open(output_dir.joinpath('keys', 'train_kidneys_mainly_healthy_combined.dat'), 'w') as f:
         for key in keys_kidney_train:
@@ -379,16 +635,17 @@ def combine_kidney_h5(input_dir, output_dir, output_file, save_path, verbose=Fal
     keys_kidney_train = [k + '/left' for k in keys_kidney_train] + [k + '/right' for k in keys_kidney_train]
     with open(output_dir.joinpath('keys', 'full_test_kidneys_mainly_healthy_combined.dat'), 'w') as f:
         for key in keys_kidney_train:
-                f.write(key + '\n')
+                f.write(key + '\n')"""
 
-    """contrasts = ['fat', 'in', 'opp', 'water']
-    hdf5file = h5py.File(Path(output_dir).joinpath('nako_kidney_preprocessed.h5'), 'w')
+    contrasts = ['fat', 'in', 'opp', 'water']
+    hdf5file = h5py.File(Path(output_dir).joinpath('nako_kidney_preprocessed_masked.h5'), 'w')
     for pat in pats:
         for contrast in contrasts:
             #keyh5 = "_".join(pat.split('_')[0:2])
-            hdf5file["/" + contrast + "/" + pat + "/left"] = h5py.ExternalLink(Path(output_dir).joinpath('nako_lkd_preprocessed.h5'), "/" + contrast + "/" + pat)
-            hdf5file["/" + contrast + "/" + pat + "/right"] = h5py.ExternalLink(Path(output_dir).joinpath('nako_rkd_preprocessed.h5'), "/" + contrast + "/" + pat)
-    hdf5file.close()"""
+            hdf5file["/" + contrast + "/" + pat + "/left"] = h5py.ExternalLink(Path(output_dir).joinpath('nako_lkd_preprocessed_masked.h5'), "/" + contrast + "/" + pat)
+            hdf5file["/" + contrast + "/" + pat + "/right"] = h5py.ExternalLink(Path(output_dir).joinpath('nako_rkd_preprocessed_masked.h5'), "/" + contrast + "/" + pat)
+    hdf5file.close()
+
 
 def signalhandler(signum, frame):
     #print("Error in loading file!")
@@ -674,26 +931,10 @@ def create_keys(keys, output_dir, n_folds=5):
                 f.write("%s\n" % item)
 
 
-def get_bounding_boxes(save_path, redo_pat=False):
+def get_bounding_boxes(save_path, redo_pat=False, largest_component=True):
     # classes {'0': 'background', '1': 'liv', '2': 'spl', '3': 'rkd', '4': 'lkd', '5': 'pnc'}
-    if redo_pat:
-        with open('../experiments/redo_pats.dat') as file:  # folder names
-            lines = file.readlines()
-            lines = [line.rstrip() for line in lines]
-        pat_idx = [int(p) for p in lines]
-        pat_idx = list(set(pat_idx))  # unique entries
-        pat_redo = [str(p) for p in pat_idx]
-        bounding_boxes_prev = pd.read_csv(Path(save_path).joinpath('bounding_boxes_abdomen.csv'))
-
-    pat_list = [p.name for p in Path(save_path).iterdir() if
-                      p.is_dir() and ('prd.nii.gz' in os.listdir(Path(save_path).joinpath(p)))]
-    bounding_boxes = {'pat': [], 'liv': [], 'spl': [], 'rkd': [], 'lkd': [], 'pnc': []}
-    for pat in tqdm(pat_list[:10]):
-        if redo_pat and pat not in pat_redo:
-            currdf = bounding_boxes_prev.loc[bounding_boxes_prev['pat'] == int(pat)]
-            for key in currdf.keys():
-                bounding_boxes[key].append(currdf[key].values[0])
-            continue
+    def process_file(pat, save_path, redo_pat, largest_component):
+        bounding_boxes = []
         pred = nib.load(Path(save_path).joinpath(pat, 'prd.nii.gz')).get_fdata()
 
         for iclass in np.arange(1, 6):
@@ -711,21 +952,68 @@ def get_bounding_boxes(save_path, redo_pat=False):
                 raise ValueError('Class not recognized')
 
             try:
-                bounding_box = regionprops(np.asarray(pred == iclass, dtype=int))[0].bbox
+                if largest_component:
+                    pred_mask = np.asarray(pred == iclass, dtype=int)
+                    labeled_mask, num_features = label(pred_mask)
+
+                    # If no features are found, return the original mask
+                    if num_features != 0:                   
+                        # Find the largest connected component
+                        largest_component = 0
+                        largest_size = 0
+                        for i in range(1, num_features + 1):
+                            component_size = np.sum(labeled_mask == i)
+                            if component_size > largest_size:
+                                largest_size = component_size
+                                largest_component = i
+                        
+                        # Create a new mask with only the largest connected component
+                        pred_mask = (labeled_mask == largest_component).astype(int)
+                    bounding_box = regionprops(pred_mask)[0].bbox
+                else:
+                    bounding_box = regionprops(np.asarray(pred == iclass, dtype=int))[0].bbox
             except:
                 bounding_box = [-1, -1, -1, -1, -1, -1]
                 print('Error in patient {}'.format(pat))
-            bounding_boxes[class_name].append(bounding_box)
-        bounding_boxes['pat'].append(pat)
+            bounding_boxes.append(bounding_box)
+        #bounding_boxes['pat'].append(pat)
+        pat = pat[:6] if len(pat) != 6 else pat 
+        with open(Path(save_path).joinpath('bounding_boxes_abdomen_largest_component_parallel.csv'), mode='a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerows([[pat] + bounding_boxes])
 
-    df = pd.DataFrame(bounding_boxes)
-    df.to_csv(Path(save_path).joinpath('bounding_boxes_abdomen.csv'), index=False)
+    if redo_pat:
+        with open('../experiments/redo_pats.dat') as file:  # folder names
+            lines = file.readlines()
+            lines = [line.rstrip() for line in lines]
+        pat_idx = [int(p) for p in lines]
+        pat_idx = list(set(pat_idx))  # unique entries
+        pat_redo = [str(p) for p in pat_idx]
+        bounding_boxes_prev = pd.read_csv(Path(save_path).joinpath('bounding_boxes_abdomen.csv'))
+
+    pat_list = [p.name for p in Path(save_path).iterdir() if
+                      p.is_dir() and ('prd.nii.gz' in os.listdir(Path(save_path).joinpath(p)))]
+    #pat_list = os.listdir(save_path)    #ToDo change back
+    
+    with open(Path(save_path).joinpath('bounding_boxes_abdomen_largest_component_parallel.csv'), mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(['pat', 'liv', 'spl', 'rkd', 'lkd', 'pnc'])
+    # multiprocessing
+    num_cores = 24
+    print(f'using {num_cores} CPU cores')
+
+    t = time.time()
+        
+    results = Parallel(n_jobs=num_cores)(delayed(process_file)(pat, save_path, redo_pat, largest_component) for pat in pat_list)    
+
+    #df = pd.DataFrame(bounding_boxes)
+    #df.to_csv(Path(save_path).joinpath('bounding_boxes_abdomen_largest_component_parallel.csv'), index=False)
 
     print('done bounding boxes')
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Preprocessing pipeline for UK Biobank abdomen MRI data.\n' \
+    parser = argparse.ArgumentParser(description='Preprocessing pipeline for NAKO abdomen MRI data.\n' \
                                                  'CSV creation\n' \
                                                  'Nifti to HDF5 conversion\n'\
                                                  'Key creation for train, test, val')
@@ -733,7 +1021,7 @@ def main():
     parser.add_argument('output_dir', help='Output directory for all files', default='/mnt/qdata/share/raeckev1/nako_30k/interim/')
     parser.add_argument('--output_file', help='Output h5 file to store processed files.', default='nako_abdomen_preprocessed.h5')
     parser.add_argument('--csv_input', help='Input CSV file', default='/home/raeckev1/nako_ukb_age/preprocess/NAKO_706_patient_data_abdominal.csv')
-    parser.add_argument('--csv_output', help='Output CSV file', default='ukb_abdomen.csv')
+    parser.add_argument('--csv_output', help='Output CSV file', default='nako_abdomen.csv')
     parser.add_argument('-v', '--verbose', action='store_true')
     args = parser.parse_args()
 
@@ -744,6 +1032,7 @@ def main():
 
     output_dir.joinpath('keys').mkdir(exist_ok=True)
 
+    #update_external_links('/mnt/qdata/share/raecker1/ukb_liv_preprocessed.h5', 'test', 'test_str')
     #keys = convert_nifti_h5(input_dir, output_dir, args.output_file, args.verbose)
     #keys = write_keys(input_dir, output_dir, args.output_file, args.verbose)
     #create_csv(keys, args.csv_input, output_dir.joinpath(args.csv_output), args.verbose)
@@ -751,12 +1040,14 @@ def main():
     #get_bounding_boxes(save_path)
     #inspect_boxes_segmentation(input_dir, output_dir, args.output_file, save_path, args.verbose)
     #convert_nifti_h5(input_dir, output_dir, args.output_file, save_path, False, args.verbose)
+    #convert_nifti_h5_masked_parallel(input_dir, output_dir, args.output_file, save_path, False, args.verbose)
     combine_kidney_h5(input_dir, output_dir, args.output_file, save_path, args.verbose)
     #check_files(input_dir, output_dir, args.output_file, save_path, False, args.verbose)
     #redo_dicom2nifti(input_dir, output_dir, args.output_file, save_path)
     #redo_segmentation(input_dir, output_dir, args.output_file, save_path)
     #redo_nifti_to_h5(input_dir, output_dir, args.output_file, save_path)
     #rewrite_keys(input_dir, output_dir, args.output_file, save_path, args.verbose)
+    #convert_masks_h5(save_path, output_dir, args.output_file, save_path, False, args.verbose)
 
     #file_path = '/mnt/qdata/share/raecker1/nako_30k/interim/nako_pnc_preprocessed.h5'
     #update_h5_links(file_path)

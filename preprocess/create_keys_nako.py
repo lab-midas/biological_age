@@ -27,17 +27,21 @@ def create_keys(keys, output_dir, fname, n_folds=5):
 
 
 def create_nako_all(csv_input, csv_output):
-    df = pd.read_csv(csv_input, usecols=['key', 'age', 'sex'])
-    df['sex'] = df['sex'].map({'F': 0, 'M': 1})
+    print('(0) create nako_all.csv')
+    df = pd.read_csv(csv_input, usecols=['ID', 'basis_age', 'basis_sex'], delimiter=';')
+    df.rename(columns={'ID': 'key', 'basis_age': 'age', 'basis_sex': 'sex'}, inplace=True)
+    print(df.columns)
+    df['sex'] = df['sex'].map({2: 0, 1: 1})   # before: F:2, M:1 now: F:0, M:1 -> consistent to UKB
     #df = df.set_index('key')
     #info_df = pd.read_csv(csv_output, index_col=0, usecols=[1,2,3,4,5], dtype={'key': 'string', 'age': np.float32})
     df['key'] = df['key'].astype(str)
     df['age'] = df['age'].astype(int)
-    df['sex'] = df['sex'].astype(str)
+    df['sex'] = df['sex'].astype(int)
     df.to_csv(csv_output, columns=['key', 'age', 'sex'], index=True)
 
 
 def get_imaging_data(h5_path, output_dir, organ):
+    print(f'(1) get keys from imaging data in h5 file for {organ}')
     fhandle = h5py.File(h5_path, 'r')
     if organ == 'brain' or organ == 'heart':
         group = fhandle['image']
@@ -51,12 +55,14 @@ def get_imaging_data(h5_path, output_dir, organ):
 
 
 def get_images_wo_age_label(organ, csv_input, output_dir):
+    print(f'(2) get keys with image data but without age label for {organ}')
     df = pd.read_csv(csv_input)
     df_no_age_label = df[df['age'].isnull()]
     df_no_age_label.to_csv(output_dir.joinpath(f'images_without_age_label_{organ}.csv'), index=False)
 
 
 def adjust_imaging_and_meta_data(organ, key_file, key_file_out, output_dir):
+    print(f'(3) get keys after adjusting for missing data or labels for {organ}')
     # imaging data
     data_df = pd.DataFrame({'key': [l.strip() for l in output_dir.joinpath('keys', f'{organ}_imaging.dat').open().readlines()]}, dtype=str)
     print(len(data_df))
@@ -80,12 +86,14 @@ def adjust_imaging_and_meta_data(organ, key_file, key_file_out, output_dir):
 
 
 def create_train_test(key_file, output_dir, out_name):
+    print(f'(4) split in train and test set for {organ}')
     keys = pd.read_csv(os.path.join(output_dir, 'keys', key_file), header=None)
     keys = keys[0].to_list()
     create_keys(keys, output_dir, out_name, n_folds=1)
 
 
 def get_full_test_set_keys(organ, output_dir, out_name):
+    print(f'(5) get full test set including test set of training and unhealthy participants for {organ}')
     train_set = output_dir.joinpath('keys', f'train_{out_name}.dat')
 
     img_df = pd.DataFrame({'key': [l.strip().split('_')[0] for l in output_dir.joinpath('keys', f'{organ}_imaging.dat').open().readlines()]}, dtype=str)                                                 # get all image keys
@@ -103,7 +111,7 @@ def get_full_test_set_keys(organ, output_dir, out_name):
 
 if __name__ == '__main__':
     #organs = ['brain', 'heart', 'kidneys', 'liver', 'spleen', 'pancreas']
-    organs = ['kidneys', 'liver', 'spleen', 'pancreas']
+    organs = ['heart']
     """h5_paths = [
         'nako_brain_preprocessed.h5', 
         'nako_heart_preprocessed.h5', 
@@ -113,23 +121,22 @@ if __name__ == '__main__':
         'nako_pnc_preprocessed.h5'
     ]"""
     h5_paths = [
-        'nako_lkd_preprocessed.h5', 
-        'nako_liv_preprocessed.h5', 
-        'nako_spl_preprocessed.h5', 
-        'nako_pnc_preprocessed.h5'
-    ]
+        'nako_heart_preprocessed.h5']
+    
+    csv_input = '/mnt/qdata/rawdata/NAKO_706/NAKO_706_META/30k/NAKO-707_export_baseline.csv'
+    csv_output = '/mnt/qdata/share/raeckev1/nako_30k/interim/nako_all.csv'
+    #create_nako_all(csv_input, csv_output)
     for i, organ in enumerate(organs):
         key_file = f'nako_keys_mainly_healthy_{organ}_full.csv'
         out_name = f'{organ}_mainly_healthy'
         key_file_out = f'nako_keys_mainly_healthy_{organ}.csv'
 
         output_dir = Path('/mnt/qdata/share/raeckev1/nako_30k/interim')
-        h5_path = output_dir.joinpath(h5_paths[i])
-        #csv_input = '/home/raeckev1/nako_ukb_age/preprocess/NAKO_706_patient_data_abdominal.csv'
-        #csv_output = '/mnt/qdata/share/raeckev1/nako_30k/interim/nako_all.csv'
+        #h5_path = output_dir.joinpath(h5_paths[i])
+
         #get_imaging_data(h5_path, output_dir, organ)
         #get_images_wo_age_label(organ, csv_output, output_dir)
         #adjust_imaging_and_meta_data(organ, key_file, key_file_out, output_dir)
         #create_train_test(key_file_out, output_dir, out_name)
         get_full_test_set_keys(organ, output_dir, out_name)
-    #create_nako_all(csv_input, csv_output)
+

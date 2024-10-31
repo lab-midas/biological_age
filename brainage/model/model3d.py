@@ -84,11 +84,11 @@ class AgeModel3DVolume(pl.LightningModule):
         samples = []
         for img, label in zip(batch['data'], batch['label']):
             if self.dataset == 'brain':
-                imgc = img[0, :, img.size()[1]//2, :].cpu().numpy() * 255.0
+                imgc = img[0, :, img.size()[2]//2, :].cpu().numpy() * 255.0
             elif self.dataset == 'abdominal':
-                imgc = img[0, :, :, int(img.size()[2] // 2)].cpu().numpy()
+                imgc = img[0, :, :, int(img.size()[3] // 2)].cpu().numpy()
             else:
-                imgc = img[0, :, :, int(img.size()[2] // 2)].cpu().numpy() * 255.0
+                imgc = img[0, :, :, int(img.size()[3] // 2)].cpu().numpy() * 255.0
             samples.append(wandb.Image(imgc, caption=f'batch {batch_idx} age {label}'))
         if not self.offline_wandb:
             self.logger.experiment.log({'samples': samples})

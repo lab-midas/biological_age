@@ -1,6 +1,6 @@
 checkpoints:
   nako_t1brain_volume:
-    - age/
+    - age/2dznv2jq
   nako_t1brain_volume_meta:
     - age/
   nako_fundus:
@@ -8,22 +8,22 @@ checkpoints:
   nako_fundus_meta:
     - age/
   nako_heart_volume:
-    - age/
+    - age/12nwqha3
   nako_heart_volume_meta:
     - age/
   nako_kidney_volume:
-    - age/3od45o22
+    - age/2ycc28tt
   nako_kidney_volume_meta:
     - age/
   nako_liver_volume:
-    - age/39ntj8y3
+    - age/    # 39ntj8y3
   nako_liver_volume_meta:
     - age/
   nako_pancreas_volume:
-    - age/3ge5g4b6
+    - age/2s6vs8t1
   nako_pancreas_volume_meta:
     - age/
   nako_spleen_volume:
-    - age/300642bz
+    - age/342smv83
   nako_spleen_volume_meta:
     - age/

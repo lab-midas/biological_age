@@ -1,3 +1,7 @@
+import os
+import h5py
+from tqdm import tqdm
+import numpy as np
 import tempfile
 import re
 import shutil
@@ -11,7 +15,55 @@ from zipfile import ZipFile
 import SimpleITK as sitk
 import nibabel as nib
 import intensity_normalization
+import matplotlib.pyplot as plt
 from nipype.interfaces import fsl
+
+
+def convert_nifti_h5(input_dir, output_dir, output_file,verbose=False):
+    """
+    Converts all nifti files in input_dir to h5 files in output_dir
+    """
+
+    # Create output directory if it does not exist
+    #output_dir.mkdir(exist_ok=True)
+
+    # Get list of all nifti files in input_dir
+    nifti_files = [f for f in input_dir.glob('*')]
+
+    # Create list of all h5 files in output_dir
+    h5_file = output_dir.joinpath(output_file)
+
+    keys = []
+    hf = h5py.File(h5_file, 'w')
+    grp_image = hf.create_group('image')
+    grp_affine = hf.create_group('affine')
+
+    for nifti_file in tqdm(nifti_files):
+        file_key = nifti_file.stem
+        img = nib.load(nifti_file.joinpath(nifti_file, 'n4_flirt_robex_fcm', file_key + '_n4_flirt_fcmnorm.nii.gz'))
+        img_data = img.get_fdata().astype(np.float32)
+        mask = nib.load(nifti_file.joinpath(nifti_file, 'n4_flirt_robex_fcm', file_key + '_n4_flirt_robexmask.nii.gz'))
+        mask_data = mask.get_fdata().astype(np.float32)
+        img_data = np.multiply(img_data, mask_data)
+        affine = img.affine.astype(np.float16)
+        keyh5 = file_key.split('_')[0]
+
+        # Write to h5 file
+        try:
+            grp_image.create_dataset(keyh5, data=img_data)
+            grp_affine.create_dataset(keyh5, data=affine)
+        except ValueError:
+            print(f'key {keyh5} not unique')
+            continue
+
+        key = keyh5.split('_')[0]
+        keys.append(key)
+        img = None
+        img_data = None
+        affine = None
+    hf.close()
+
+    return keys
 
 
 def n4_bias_field_correction(input_file,
@@ -218,6 +270,7 @@ def main():
                                                  'FCM WM intensity normalization')
     parser.add_argument('input_dir', help='Input directory with files (T1w brain MRI, .nii.gz)')
     parser.add_argument('output_dir', help='Output directory to store processed files.')
+    parser.add_argument('--h5_dir', help='Directory to store h5 file', default='/mnt/qdata/share/raeckev1/nako_30k/interim/')
     parser.add_argument('--reference', help='MNI152-1mm reference .nii.gz file')
     parser.add_argument('--robex', help='ROBEX installation directory.')
     parser.add_argument('--split',
@@ -243,16 +296,19 @@ def main():
 
     input_dir = Path(args.input_dir)
     output_dir = Path(args.output_dir)
+    h5_dir = Path(args.h5_dir)
     file_list = list(input_dir.glob('*.nii.gz'))
+    output_file = 'nako_brain_preprocessed.h5'
 
-    for file in file_list:
+    """for file in file_list:
         out_file_dir = output_dir.joinpath(file.stem.split('.')[0])
         process_brain_t1(file,
                         out_file_dir,
                         reference_file=reference_file,
                         robex_dir=robex_dir,
                         split=split,
-                        verbose=args.verbose)
+                        verbose=args.verbose)"""
+    convert_nifti_h5(output_dir, h5_dir, output_file)
 
 
 if __name__ == '__main__':
