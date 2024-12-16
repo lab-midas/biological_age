@@ -100,3 +100,15 @@ experiments/job*
 preprocess/job*
 lightning_logs/
 
+dummy.png
+dummy_new.png
+preprocess/dummy_masked_organ_liv.png
+preprocess/dummy_masked_organ_lkd.png
+preprocess/dummy_masked_organ_pnc.png
+preprocess/dummy_masked_organ_rkd.png
+preprocess/dummy_masked_organ_spl.png
+preprocess/dummy.py
+dicom_patient_data.csv
+preprocess/test.py
+preprocess/test.ipynb
+preprocess/test.py
