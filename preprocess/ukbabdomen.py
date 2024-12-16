@@ -255,6 +255,60 @@ def convert_nifti_h5_masked_parallel(input_dir, output_dir, output_file, save_pa
     return keys
 
 
+def renew_links(input_dir, output_dir, output_file, save_path, parallelize, verbose=False):
+    class_list = [1] # 1: liv, 2: spleen, 3: right kidney, 4: left kidney, 5: pancreas
+    # Create output directory if it does not exist
+    output_dir.mkdir(exist_ok=True)
+    bounding_boxes = pd.read_csv(Path(save_path).joinpath('bounding_boxes_abdomen.csv'))
+    bounding_boxes_rem = bounding_boxes.loc[(bounding_boxes['liv'] != '[-1, -1, -1, -1, -1, -1]') &
+                                            (bounding_boxes['spl'] != '[-1, -1, -1, -1, -1, -1]') &
+                                            (bounding_boxes['rkd'] != '[-1, -1, -1, -1, -1, -1]') &
+                                            (bounding_boxes['lkd'] != '[-1, -1, -1, -1, -1, -1]') &
+                                            (bounding_boxes['pnc'] != '[-1, -1, -1, -1, -1, -1]')]
+
+    pats = list(bounding_boxes_rem['pat'].values)
+    pats = [str(k) for k in pats]
+    contrasts = ['fat', 'inp', 'opp', 'wat']
+
+    files = ['ukb_liv_preprocessed_masked.h5', 'ukb_spl_preprocessed_masked.h5', 'ukb_rkd_preprocessed_masked.h5', 'ukb_lkd_preprocessed_masked.h5', 'ukb_pnc_preprocessed_masked.h5']
+    modes = ['w', 'w', 'w', 'w', 'w']
+
+    hfs = {'liv': h5py.File(output_dir.joinpath('ukb_liv_preprocessed_masked.h5'), modes[0]),
+           'spl': h5py.File(output_dir.joinpath('ukb_spl_preprocessed_masked.h5'), modes[1]),
+           'rkd': h5py.File(output_dir.joinpath('ukb_rkd_preprocessed_masked.h5'), modes[2]),
+           'lkd': h5py.File(output_dir.joinpath('ukb_lkd_preprocessed_masked.h5'), modes[3]),
+           'pnc': h5py.File(output_dir.joinpath('ukb_pnc_preprocessed_masked.h5'), modes[4])}
+
+    for pat in tqdm(pats):
+        for contrast in contrasts:
+            # check existence in file
+            exists_all = []
+            for iclass in class_list:
+                if iclass == 1:
+                    class_name = 'liv'
+                elif iclass == 2:
+                    class_name = 'spl'
+                elif iclass == 3:
+                    class_name = 'rkd'
+                elif iclass == 4:
+                    class_name = 'lkd'
+                elif iclass == 5:
+                    class_name = 'pnc'
+                else:
+                    raise ValueError('Class not recognized')
+                #if modes[iclass-1] == 'a' and contrast + '/' + pat in hfs[class_name]:
+                if output_dir.joinpath(Path(files[iclass-1]).stem, contrast + '_' + pat + '.h5').exists(): # checks if files (4 contrasts) for pat exist in ukb_xxx_preprocessed dir  
+                    # link pats in ukb_xxx_preprocessed.h5 if files for pat already exist in ukb_xxx_preprocessed dir
+                    file_curr = output_dir.joinpath(Path(files[iclass - 1]).stem, contrast + '_' + pat + '.h5')
+                    if not parallelize:
+                        hfs[class_name][contrast + '/' + pat] = h5py.ExternalLink(file_curr, "/image")
+                    if iclass == 1 and contrast == 'fat':
+                        file_curr = output_dir.joinpath(Path(files[iclass - 1]).stem, 'affine_' + pat + '.h5')
+                        if not parallelize:
+                            hfs[class_name]['affine/' + pat] = h5py.ExternalLink(file_curr, "/affine")
+    
+
+
 def convert_nifti_h5_masked(input_dir, output_dir, output_file, save_path, parallelize, verbose=False):
     """
     Converts all nifti files in input_dir to h5 files in output_dir
@@ -626,22 +680,28 @@ def combine_kidney_h5(input_dir, output_dir, output_file, save_path, verbose=Fal
     keys_kidney_test = [k + '/left' for k in keys_kidney_test] + [k + '/right' for k in keys_kidney_test]
     with open(output_dir.joinpath('keys', 'test_kidneys_mainly_healthy_combined.dat'), 'w') as f:
         for key in keys_kidney_test:
-            f.write(key + '\n')"""
+            f.write(key + '\n')
 
     keys_kidney_train = [l.strip() for l in Path(output_dir).joinpath('keys', 'full_test_kidneys_mainly_healthy.dat').open().readlines()]
     keys_kidney_train = [k + '/left' for k in keys_kidney_train] + [k + '/right' for k in keys_kidney_train]
     with open(output_dir.joinpath('keys', 'full_test_kidneys_mainly_healthy_combined.dat'), 'w') as f:
         for key in keys_kidney_train:
                 f.write(key + '\n')
+                
+    keys_kidney_gradcam = [l.strip() for l in Path(output_dir).joinpath('keys', 'gradcam_kidneys_mainly_healthy.dat').open().readlines()]
+    keys_kidney_gradcam = [k + '/left' for k in keys_kidney_gradcam] + [k + '/right' for k in keys_kidney_gradcam]
+    with open(output_dir.joinpath('keys', 'gradcam_kidneys_mainly_healthy_combined.dat'), 'w') as f:
+        for key in keys_kidney_gradcam:
+                f.write(key + '\n')"""
 
-    """contrasts = ['fat', 'inp', 'opp', 'wat']
-    hdf5file = h5py.File(Path(output_dir).joinpath('ukb_kidney_preprocessed.h5'), 'w')
+    contrasts = ['fat', 'inp', 'opp', 'wat']
+    hdf5file = h5py.File(Path(output_dir).joinpath('ukb_kidney_preprocessed_masked.h5'), 'w')
     for pat in pats:
         for contrast in contrasts:
             #keyh5 = "_".join(pat.split('_')[0:2])
-            hdf5file["/" + contrast + "/" + pat + "/left"] = h5py.ExternalLink(Path(output_dir).joinpath('ukb_lkd_preprocessed.h5'), "/" + contrast + "/" + pat)
-            hdf5file["/" + contrast + "/" + pat + "/right"] = h5py.ExternalLink(Path(output_dir).joinpath('ukb_rkd_preprocessed.h5'), "/" + contrast + "/" + pat)
-    hdf5file.close()"""
+            hdf5file["/" + contrast + "/" + pat + "/left"] = h5py.ExternalLink(Path(output_dir).joinpath('ukb_lkd_preprocessed_masked.h5'), "/" + contrast + "/" + pat)
+            hdf5file["/" + contrast + "/" + pat + "/right"] = h5py.ExternalLink(Path(output_dir).joinpath('ukb_rkd_preprocessed_masked.h5'), "/" + contrast + "/" + pat)
+    hdf5file.close()
 
 def signalhandler(signum, frame):
     #print("Error in loading file!")
@@ -994,8 +1054,8 @@ def main():
     # Create output directory if it does not exist
     input_dir = Path(args.input_dir)
     output_dir = Path(args.output_dir)
-    #save_path = Path('/mnt/qdata/share/raecker1/ukbdata_70k/abdominal_MRI/seg')  # for segmentations denbi
-    save_path = Path('/mnt/qdata/rawdata/UKBIOBANK/ukb_70k/abdominal_MRI/seg/')  # for segmentations clinic
+    save_path = Path('/mnt/qdata/share/raecker1/ukbdata_70k/abdominal_MRI/seg')  # for segmentations denbi
+    #save_path = Path('/mnt/qdata/rawdata/UKBIOBANK/ukb_70k/abdominal_MRI/seg/')  # for segmentations clinic
 
     output_dir.joinpath('keys').mkdir(exist_ok=True)
 
@@ -1006,7 +1066,9 @@ def main():
     #get_bounding_boxes(save_path)
     #inspect_boxes_segmentation(input_dir, output_dir, args.output_file, save_path, args.verbose)
     #convert_nifti_h5(input_dir, output_dir, args.output_file, save_path, False, args.verbose)
-    convert_nifti_h5_masked_parallel(input_dir, output_dir, args.output_file, save_path, True, args.verbose)
+    #convert_nifti_h5_masked(input_dir, output_dir, args.output_file, save_path, False, args.verbose)
+    #convert_nifti_h5_masked_parallel(input_dir, output_dir, args.output_file, save_path, True, args.verbose)
+    renew_links(input_dir, output_dir, args.output_file, save_path, False, args.verbose)
     #combine_kidney_h5(input_dir, output_dir, args.output_file, save_path, args.verbose)
     #check_files(input_dir, output_dir, args.output_file, save_path, False, args.verbose)
     #redo_dicom2nifti(input_dir, output_dir, args.output_file, save_path)

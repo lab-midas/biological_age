@@ -42,17 +42,19 @@ loader:
 
 dataset:
   mode: volume
-  data: !ENV ${DATA}/UKB/interim/ukb_liv_preprocessed.h5
+  data: !ENV ${DATA}/interim/ukb_liv_preprocessed_masked.h5
   group:
-  info: !ENV ${DATA}/UKB/interim/ukb_all.csv
+  info: !ENV ${DATA}/interim/ukb_all.csv
   column: age
   preload: True
+  init_load: False
   fold: 0
-  train: !ENV ${DATA}/UKB/interim/keys/train_imaging_abdomen.dat
-  val:   !ENV ${DATA}/UKB/interim/keys/test_abdomen.dat
-  gradcam_val: !ENV ${DATA}/UKB/interim/keys/test_abdomen_gradcam.dat
+  train: !ENV ${DATA}/interim/keys/train_liver_mainly_healthy.dat
+  val:   !ENV ${DATA}/interim/keys/test_liver_mainly_healthy.dat
+  pred:  !ENV ${DATA}/interim/keys/full_test_liver_mainly_healthy.dat
+  gradcam:  !ENV ${DATA}/interim/keys/gradcam_liver_mainly_healthy.dat
   debug:
-  #debug: !ENV ${DATA}/UKB/interim/keys/debug_abdomen.dat
+
   data_augmentation: True
   crop_size:
   crop_margins:

@@ -89,6 +89,7 @@ def create_train_test(key_file, output_dir, out_name):
     print(f'(4) split in train and test set for {organ}')
     keys = pd.read_csv(os.path.join(output_dir, 'keys', key_file), header=None)
     keys = keys[0].to_list()
+    #keys = keys[:int(len(keys) * 0.3)]
     create_keys(keys, output_dir, out_name, n_folds=1)
 
 
@@ -103,15 +104,37 @@ def get_full_test_set_keys(organ, output_dir, out_name):
     df_filtered = img_df[~img_df['key'].isin(set(img_wo_age['key']))]       # filter out images without age label
     df_out = df_filtered[~df_filtered['key'].isin(set(train_df['key']))]    # filter out images in train set
     test_key_list = df_out['key'].to_list()
+    #test_key_list = test_key_list[int(len(test_key_list) * 0.9):]
 
     with open(output_dir.joinpath('keys', f'full_test_{out_name}.dat'), 'w') as f:
         for key in test_key_list:
             f.write("%s\n" % key)
 
+def get_gradcam_keys(organ, output_dir, key_file_out, out_name):
+    print(f'(6) get gradcam test set including 50 samples of the healthy test set and 50 subjects of unhealthy subjects {organ}')
+    test_set = output_dir.joinpath('keys', f'test_{out_name}.dat')
+
+    img_df = pd.DataFrame({'key': [l.strip().split('_')[0] for l in output_dir.joinpath('keys', f'{organ}_imaging.dat').open().readlines()]}, dtype=str)                                                 # get all image keys
+    img_wo_age = pd.read_csv(os.path.join(output_dir, f'images_without_age_label_{organ}.csv'), header=None, names=['key'], dtype=str)     # get all image keys without age label
+    test_df = pd.DataFrame({'key': [l.strip() for l in Path(test_set).open().readlines()]}) # get all keys in test set
+    healthy_df = pd.read_csv(os.path.join(output_dir, 'keys', key_file_out), header=None, names=['key'], dtype=str)
+    healthy_samples = test_df.sample(n=50, random_state=42)                     # randomly select 50 subjects from test set
+
+    df_filtered = img_df[~img_df['key'].isin(set(img_wo_age['key']))]       # filter out images without age label
+    df_out = df_filtered[~df_filtered['key'].isin(set(healthy_df['key']))]    # unhealthy subjects
+    unhealthy_samples = df_out.sample(n=50, random_state=42)                 # randomly select 50 subjects from unhealthy set
+    combined_samples = pd.concat([healthy_samples, unhealthy_samples])            # combine the healthy and unhealthy samples
+    
+    key_list = combined_samples['key'].to_list()
+
+    with open(output_dir.joinpath('keys', f'gradcam_{out_name}.dat'), 'w') as f:
+        for key in key_list:
+            f.write("%s\n" % key)
+
 
 if __name__ == '__main__':
     #organs = ['brain', 'heart', 'kidneys', 'liver', 'spleen', 'pancreas']
-    organs = ['heart']
+    organs = ['pancreas']
     """h5_paths = [
         'nako_brain_preprocessed.h5', 
         'nako_heart_preprocessed.h5', 
@@ -120,8 +143,8 @@ if __name__ == '__main__':
         'nako_spl_preprocessed.h5', 
         'nako_pnc_preprocessed.h5'
     ]"""
-    h5_paths = [
-        'nako_heart_preprocessed.h5']
+    """h5_paths = [
+        'nako_heart_preprocessed.h5']"""
     
     csv_input = '/mnt/qdata/rawdata/NAKO_706/NAKO_706_META/30k/NAKO-707_export_baseline.csv'
     csv_output = '/mnt/qdata/share/raeckev1/nako_30k/interim/nako_all.csv'
@@ -139,4 +162,5 @@ if __name__ == '__main__':
         #adjust_imaging_and_meta_data(organ, key_file, key_file_out, output_dir)
         #create_train_test(key_file_out, output_dir, out_name)
         get_full_test_set_keys(organ, output_dir, out_name)
+        #get_gradcam_keys(organ, output_dir, key_file_out, out_name)
 

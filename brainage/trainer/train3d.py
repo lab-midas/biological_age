@@ -21,7 +21,7 @@ from batchgenerators.transforms.spatial_transforms import MirrorTransform
 from batchgenerators.transforms.crop_and_pad_transforms import CenterCropTransform, RandomCropTransform
 from batchgenerators.transforms.abstract_transforms import Compose
 
-sys.path.append('/home/raecker1/nako_ukb_age')
+sys.path.append('/home/raeckev1/nako_ukb_age')
 
 from brainage.model.model3d import AgeModel3DVolume
 from brainage.model.model2d import AgeModel2DChannels
@@ -36,8 +36,6 @@ config = os.getenv('CONFIG')
 # @hydra.main(config_path=os.path.dirname(config), config_name=os.path.splitext(os.path.basename(config))[0])
 def main():
     cfg, args = train_args()
-    # config
-    #print("Rank: ", sys.argv)
 
     project = cfg['project']['name']
     job = cfg['project']['job']
@@ -70,6 +68,7 @@ def main():
     gamma_range = cfg['dataset']['gamma_range']
     mirror_axis = cfg['dataset']['mirror_axis']
     preload = cfg['dataset']['preload']
+    init_load = cfg['dataset']['init_load']
     meta = cfg['model']['position']
     seed = 42
     seed_everything(seed)
@@ -111,7 +110,7 @@ def main():
     print("=====================")
     print("Job: ", job)
     print("Dataset: ", dataset)
-    print("Cohort: ", cohort)   
+    print("Cohort: ", cohort)
     print("=====================")
 
     assert data_mode in ['patchwise', 'volume']

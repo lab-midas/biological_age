@@ -47,10 +47,12 @@ dataset:
   info: !ENV ${DATA}/interim/ukb_all.csv
   column: age
   preload: False
+  init_load: False
   fold: 0
-  train: !ENV ${DATA}/interim/keys/train_brain_healthy.dat
-  val:   !ENV ${DATA}/interim/keys/test_brain_healthy.dat
-  pred:  !ENV ${DATA}/interim/keys/full_test_brain_healthy.dat
+  train: !ENV ${DATA}/interim/keys/train_brain_mainly_healthy.dat
+  val:   !ENV ${DATA}/interim/keys/test_brain_mainly_healthy.dat
+  pred:  !ENV ${DATA}/interim/keys/full_test_brain_mainly_healthy.dat
+  gradcam:  !ENV ${DATA}/interim/keys/gradcam_brain_mainly_healthy.dat
   debug:
   #debug: !ENV ${DATA}/interim/keys/debug.dat
   data_augmentation: True

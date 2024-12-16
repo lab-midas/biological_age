@@ -48,10 +48,10 @@ dataset:
   column: age
   preload: False
   fold: 0
-  train: !ENV ${DATA}/interim/keys/train_heart_healthy.dat
-  val:   !ENV ${DATA}/interim/keys/test_heart_healthy.dat
-  pred:  !ENV ${DATA}/interim/keys/full_test_heart_healthy.dat
-  gradcam_val: !ENV ${DATA}/interim/keys/test_gradcam.dat
+  train: !ENV ${DATA}/interim/keys/train_heart_mainly_healthy.dat
+  val:   !ENV ${DATA}/interim/keys/test_heart_mainly_healthy.dat
+  pred:  !ENV ${DATA}/interim/keys/full_test_heart_mainly_healthy.dat
+  gradcam:  !ENV ${DATA}/interim/keys/gradcam_heart_mainly_healthy.dat
   debug:
   #debug: ${env:DATA}/UKB/interim/keys/debug.dat
   data_augmentation: True

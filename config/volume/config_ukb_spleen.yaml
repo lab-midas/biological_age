@@ -47,6 +47,7 @@ dataset:
   info: !ENV ${DATA}/UKB/interim/ukb_all.csv
   column: age
   preload: True
+  init_load: False
   fold: 0
   train: !ENV ${DATA}/UKB/interim/keys/train_imaging_abdomen.dat
   val:   !ENV ${DATA}/UKB/interim/keys/test_abdomen.dat

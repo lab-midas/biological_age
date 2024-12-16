@@ -22,11 +22,44 @@ import numpy as np
 from sklearn.model_selection import train_test_split, KFold
 from skimage.measure import regionprops
 from scipy.ndimage import label
+from scipy.ndimage import zoom
 from nakoheart import crop
 import ast
 import matplotlib.pyplot as plt
 from joblib import Parallel, delayed
 from glob import glob
+
+
+def downsample_image(image, target_dim, target_size):
+    """
+    Downsample a 3D image to a new size along a given dimension, preserving aspect ratio.
+
+    Parameters:
+    - image: 3D numpy array (e.g., shape (depth, height, width))
+    - target_dim: int (0 for depth, 1 for height, 2 for width)
+    - target_size: int (desired size for the specified dimension)
+
+    Returns:
+    - downsampled_image: 3D numpy array with the new size, maintaining aspect ratio
+    """
+    # Get the original dimensions of the image
+    original_shape = np.array(image.shape)
+    #print(f'original_shape: {original_shape}')
+    
+    # Calculate the scaling factor for the target dimension
+    scale_factor = target_size / original_shape[target_dim]
+    #print(f'scale_factor: {scale_factor}')
+    
+    # Calculate the new shape for all dimensions
+    new_shape = (original_shape * scale_factor).astype(int)
+
+    
+    # Resize the image using the scaling factor for each dimension
+    scaling_factors = new_shape / original_shape
+    #print(f'scaling_factors: {scaling_factors}')
+    downsampled_image = zoom(image, scaling_factors, order=1)  # order=1 is bilinear interpolation
+    print(f'new_shape: {downsampled_image.shape}')
+    return downsampled_image
 
 
 def unzip(zip_file, output_dir):
@@ -166,13 +199,12 @@ def convert_nifti_h5_masked_parallel(input_dir, output_dir, output_file, save_pa
 
     pats = list(bounding_boxes_rem['pat'].values)
     pats = [str(k) for k in pats]
-    pats = ['123585']
 
     sel_shape = {'liv': [185, 150, 70], 'spl': [80, 80, 50], 'rkd': [60, 60, 50], 'lkd': [60, 60, 50], 'pnc': [120, 70, 70]}     #nako
     contrasts = ['fat', 'in', 'opp', 'water']
 
     keys = []
-    files = ['nako_liv_preprocessed_masked.h5', 'nako_spl_preprocessed_masked.h5', 'nako_rkd_preprocessed_masked.h5', 'nako_lkd_preprocessed_masked.h5', 'nako_pnc_preprocessed_masked.h5']
+    files = ['nako_liv_preprocessed_masked_ds.h5', 'nako_spl_preprocessed_masked.h5', 'nako_rkd_preprocessed_masked.h5', 'nako_lkd_preprocessed_masked.h5', 'nako_pnc_preprocessed_masked_ds.h5']
 
     for idx, file in enumerate(files):
         output_dir.joinpath(Path(file).stem).mkdir(exist_ok=True)   # create nako_xxx_preprocessed dir
@@ -182,6 +214,7 @@ def convert_nifti_h5_masked_parallel(input_dir, output_dir, output_file, save_pa
             # check existence in file
             exists_all = []
             for iclass in np.arange(1, 6):
+            #for iclass in [1,5]:
                 if iclass == 1: class_name = 'liv'
                 elif iclass == 2: class_name = 'spl'
                 elif iclass == 3: class_name = 'rkd'
@@ -220,6 +253,7 @@ def convert_nifti_h5_masked_parallel(input_dir, output_dir, output_file, save_pa
                 return
 
             for iclass in np.arange(1, 6):
+            #for iclass in [1,5]:
                 if iclass == 1: class_name = 'liv'
                 elif iclass == 2: class_name = 'spl'
                 elif iclass == 3: class_name = 'rkd'
@@ -238,6 +272,10 @@ def convert_nifti_h5_masked_parallel(input_dir, output_dir, output_file, save_pa
                 img_crop = crop(img_data, sel_shape_curr, center)   # crop image around segmentation mask
                 mask_crop = crop(img_mask, sel_shape_curr, center)
                 img_crop = img_crop * mask_crop
+                if iclass == 1:
+                    img_crop = downsample_image(img_crop, 0, 120)
+                elif iclass == 5:
+                    img_crop = downsample_image(img_crop, 0, 80)
 
                 file_curr = output_dir.joinpath(Path(files[iclass-1]).stem, contrast + '_' + pat + '.h5')
                 with h5py.File(file_curr, 'w') as hfcurr:
@@ -248,7 +286,7 @@ def convert_nifti_h5_masked_parallel(input_dir, output_dir, output_file, save_pa
                     with h5py.File(file_curr, 'w') as hfcurr:
                         hfcurr.create_dataset('affine', data=affine)
 
-    num_cores = 1
+    num_cores = 24
     print(f'using {num_cores} CPU cores')
 
     t = time.time()
@@ -287,7 +325,7 @@ def convert_nifti_h5_masked(input_dir, output_dir, output_file, save_path, paral
     contrasts = ['fat', 'in', 'opp', 'water']
 
     keys = []
-    files = ['nako_liv_preprocessed_masked.h5', 'nako_spl_preprocessed_masked.h5', 'nako_rkd_preprocessed_masked.h5', 'nako_lkd_preprocessed_masked.h5', 'nako_pnc_preprocessed_masked.h5']
+    files = ['nako_liv_preprocessed_masked_ds.h5', 'nako_spl_preprocessed_masked_ds.h5', 'nako_rkd_preprocessed_masked_ds.h5', 'nako_lkd_preprocessed_masked_ds.h5', 'nako_pnc_preprocessed_masked_ds.h5']
     modes = ['w', 'w', 'w', 'w', 'w']
     for idx, file in enumerate(files):
         if output_dir.joinpath(file).exists():
@@ -295,11 +333,11 @@ def convert_nifti_h5_masked(input_dir, output_dir, output_file, save_path, paral
             #modes[idx] = 'a'
         output_dir.joinpath(Path(file).stem).mkdir(exist_ok=True)   # create ukb_xxx_preprocessed dir
 
-    hfs = {'liv': h5py.File(output_dir.joinpath('nako_liv_preprocessed_masked.h5'), modes[0]),
-           'spl': h5py.File(output_dir.joinpath('nako_spl_preprocessed_masked.h5'), modes[1]),
-           'rkd': h5py.File(output_dir.joinpath('nako_rkd_preprocessed_masked.h5'), modes[2]),
-           'lkd': h5py.File(output_dir.joinpath('nako_lkd_preprocessed_masked.h5'), modes[3]),
-           'pnc': h5py.File(output_dir.joinpath('nako_pnc_preprocessed_masked.h5'), modes[4])}
+    hfs = {'liv': h5py.File(output_dir.joinpath('nako_liv_preprocessed_masked_ds.h5'), modes[0]),
+           'spl': h5py.File(output_dir.joinpath('nako_spl_preprocessed_masked_ds.h5'), modes[1]),
+           'rkd': h5py.File(output_dir.joinpath('nako_rkd_preprocessed_masked_ds.h5'), modes[2]),
+           'lkd': h5py.File(output_dir.joinpath('nako_lkd_preprocessed_masked_ds.h5'), modes[3]),
+           'pnc': h5py.File(output_dir.joinpath('nako_pnc_preprocessed_masked_ds.h5'), modes[4])}
 
     #for pat in tqdm(pats):
     def process_file(pat, parallelize):
@@ -307,8 +345,9 @@ def convert_nifti_h5_masked(input_dir, output_dir, output_file, save_path, paral
         #    continue
         for contrast in contrasts:
             # check existence in file
-            exists_all = []
-            for iclass in np.arange(1, 6):
+            exists_all = [False, False, False, False, False]
+            #for iclass in np.arange(1, 6):
+            for iclass in [1,5]:
                 if iclass == 1:
                     class_name = 'liv'
                 elif iclass == 2:
@@ -323,14 +362,16 @@ def convert_nifti_h5_masked(input_dir, output_dir, output_file, save_path, paral
                     raise ValueError('Class not recognized')
                 #if modes[iclass-1] == 'a' and contrast + '/' + pat in hfs[class_name]:
                 if output_dir.joinpath(Path(files[iclass-1]).stem, contrast + '_' + pat + '.h5').exists(): # checks if files (4 contrasts) for pat exist in ukb_xxx_preprocessed dir
-                    exists_all.append(True)
+                    exists_all[iclass-1] = True
                 else:
-                    exists_all.append(False)
+                    exists_all[iclass-1] = False
             
             if np.all(exists_all):
                 doload = False
             else:
                 doload = True
+            print('doload false hardcoded')
+            doload = False  #!!!!!!!!!!!!!!!!!!!!!! change back
 
             if doload:  # load nifti files only if not yet in ukb_xxx_preprocessed dir
                 if not os.path.exists(input_dir.joinpath(pat)):
@@ -353,7 +394,8 @@ def convert_nifti_h5_masked(input_dir, output_dir, output_file, save_path, paral
                 mask_data = mask.get_fdata().astype(np.float32)
 
 
-            for iclass in np.arange(1, 6):
+            #for iclass in np.arange(1, 6):
+            for iclass in [1,5]:
                 #if exists_all[iclass-1]:
                 #    continue
                 if iclass == 1:
@@ -379,7 +421,7 @@ def convert_nifti_h5_masked(input_dir, output_dir, output_file, save_path, paral
                             hfs[class_name]['affine/' + pat] = h5py.ExternalLink(file_curr, "/affine")
                     continue
 
-                img_mask = np.where(mask_data == iclass, 1, 0)
+                """img_mask = np.where(mask_data == iclass, 1, 0)
 
                 sel_shape_curr = sel_shape[class_name]
 
@@ -413,7 +455,7 @@ def convert_nifti_h5_masked(input_dir, output_dir, output_file, save_path, paral
                     with h5py.File(file_curr, 'w') as hfcurr:
                         hfcurr.create_dataset('affine', data=affine)
                     if not parallelize:
-                        hfs[class_name]['affine/' + pat] = h5py.ExternalLink(file_curr, "/affine")
+                        hfs[class_name]['affine/' + pat] = h5py.ExternalLink(file_curr, "/affine")"""
 
     if parallelize:
         num_cores = 24
@@ -636,15 +678,21 @@ def combine_kidney_h5(input_dir, output_dir, output_file, save_path, verbose=Fal
     with open(output_dir.joinpath('keys', 'full_test_kidneys_mainly_healthy_combined.dat'), 'w') as f:
         for key in keys_kidney_train:
                 f.write(key + '\n')"""
+    
+    keys_kidney_gradcam = [l.strip() for l in Path(output_dir).joinpath('keys', 'gradcam_kidneys_mainly_healthy.dat').open().readlines()]
+    keys_kidney_gradcam = [k + '/left' for k in keys_kidney_gradcam] + [k + '/right' for k in keys_kidney_gradcam]
+    with open(output_dir.joinpath('keys', 'gradcam_kidneys_mainly_healthy_combined.dat'), 'w') as f:
+        for key in keys_kidney_gradcam:
+                f.write(key + '\n')
 
-    contrasts = ['fat', 'in', 'opp', 'water']
+    """contrasts = ['fat', 'in', 'opp', 'water']
     hdf5file = h5py.File(Path(output_dir).joinpath('nako_kidney_preprocessed_masked.h5'), 'w')
     for pat in pats:
         for contrast in contrasts:
             #keyh5 = "_".join(pat.split('_')[0:2])
             hdf5file["/" + contrast + "/" + pat + "/left"] = h5py.ExternalLink(Path(output_dir).joinpath('nako_lkd_preprocessed_masked.h5'), "/" + contrast + "/" + pat)
             hdf5file["/" + contrast + "/" + pat + "/right"] = h5py.ExternalLink(Path(output_dir).joinpath('nako_rkd_preprocessed_masked.h5'), "/" + contrast + "/" + pat)
-    hdf5file.close()
+    hdf5file.close()"""
 
 
 def signalhandler(signum, frame):
@@ -1041,7 +1089,8 @@ def main():
     #inspect_boxes_segmentation(input_dir, output_dir, args.output_file, save_path, args.verbose)
     #convert_nifti_h5(input_dir, output_dir, args.output_file, save_path, False, args.verbose)
     #convert_nifti_h5_masked_parallel(input_dir, output_dir, args.output_file, save_path, False, args.verbose)
-    combine_kidney_h5(input_dir, output_dir, args.output_file, save_path, args.verbose)
+    convert_nifti_h5_masked(input_dir, output_dir, args.output_file, save_path, False, args.verbose)
+    #combine_kidney_h5(input_dir, output_dir, args.output_file, save_path, args.verbose)
     #check_files(input_dir, output_dir, args.output_file, save_path, False, args.verbose)
     #redo_dicom2nifti(input_dir, output_dir, args.output_file, save_path)
     #redo_segmentation(input_dir, output_dir, args.output_file, save_path)

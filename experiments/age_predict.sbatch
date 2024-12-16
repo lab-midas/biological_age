@@ -12,7 +12,7 @@
 export PRJ=/home/raecker1/nako_ukb_age  # denbi
 export CKPT=/home/raecker1/nako_ukb_age
 export DATA=/mnt/qdata/share/raecker1/ukbdata_70k
-export OUT=/home/raecker1/nako_ukb_age/results/ukb_age_healthy_train_set_70k
+export OUT=/home/raecker1/nako_ukb_age/results/ukb_age_mainly_healthy_train_set_70k
 export PATH=/opt/conda/raecker1/envs/nakoukb/bin:/opt/miniconda3/condabin:$PATH
 
 module load cuda/11.3
