@@ -109,6 +109,5 @@ preprocess/dummy_masked_organ_rkd.png
 preprocess/dummy_masked_organ_spl.png
 preprocess/dummy.py
 dicom_patient_data.csv
-preprocess/test.py
-preprocess/test.ipynb
-preprocess/test.py
+preprocess/test*
+test*
