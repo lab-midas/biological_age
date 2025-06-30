@@ -282,7 +282,7 @@ def main():
         # Create checkpoint callbacks
         # Save model with best validation loss
         checkpoint_callback_best = ModelCheckpoint(
-            monitor='val_loss',
+            monitor='validation/loss',
             dirpath=checkpoint_dir,
             filename='best-val-loss-{epoch:02d}-{val_loss:.2f}',
             save_top_k=1,
