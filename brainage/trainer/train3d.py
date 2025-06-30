@@ -13,6 +13,7 @@ from omegaconf import OmegaConf
 from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.loggers import NeptuneLogger
+from pytorch_lightning.callbacks import ModelCheckpoint
 #from dotenv import load_dotenv
 import wandb
 
@@ -272,8 +273,36 @@ def main():
         model.write_results(result_path)
 
     else:  # train
+        # Define checkpoint directory
+        ckpt_dir = os.environ.get('CKPT', 'checkpoints')
+        checkpoint_dir = os.path.join(ckpt_dir, f'{job}-{job_id}')
+        
+        print(f'Checkpoints will be saved to: {checkpoint_dir}')
+        
+        # Create checkpoint callbacks
+        # Save model with best validation loss
+        checkpoint_callback_best = ModelCheckpoint(
+            monitor='val_loss',
+            dirpath=checkpoint_dir,
+            filename='best-val-loss-{epoch:02d}-{val_loss:.2f}',
+            save_top_k=1,
+            mode='min',
+            save_last=False
+        )
+        
+        # Save model from last epoch
+        checkpoint_callback_last = ModelCheckpoint(
+            dirpath=checkpoint_dir,
+            filename='last-epoch-{epoch:02d}',
+            save_top_k=1,
+            save_last=True
+        )
+        
+        callbacks = [checkpoint_callback_best, checkpoint_callback_last]
+        
         trainer = Trainer(logger=wandb_logger, accelerator='gpu', devices=cfg['trainer']['gpus'], max_epochs=cfg['trainer']['max_epochs'],
-                          benchmark=cfg['trainer']['benchmark'], val_check_interval=cfg['trainer']['val_check_interval'], strategy="ddp")
+                          benchmark=cfg['trainer']['benchmark'], val_check_interval=cfg['trainer']['val_check_interval'], strategy="ddp",
+                          callbacks=callbacks)
 
         if trainer.global_rank == 0 and not offline_wandb:
             wandb_logger[0].experiment.config.update(cfg)
