@@ -110,4 +110,6 @@ preprocess/dummy_masked_organ_spl.png
 preprocess/dummy.py
 dicom_patient_data.csv
 preprocess/test*
+preprocess/test.py
+preprocess/test.ipynb
 test*
