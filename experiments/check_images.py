@@ -84,8 +84,8 @@ def load_fundus_data(data, key):
     plt.imsave(f'/home/raecker1/test/{key}_{group_str[:-1]}_fundus.png', data)
 
 if __name__ == '__main__':
-    organ = 'brain'
-    keys = ['1000295', '1002035', '1002551', '1008408', '1008801', '5143978', '4964011']
+    organ = 'heart'
+    keys = ['1077826', '1002035', '1002551', '1008408', '1008801', '5143978', '4964011']
     #key = '4675538'
     """keys = ['2837023', '3753282', '4803283', '4663445', '2693985', '1839110', '4525038', 
             '4451253', '5923528', '2693186', '3987000', '5857948', '1421691', '1608783', 
@@ -114,9 +114,9 @@ if __name__ == '__main__':
             """data = '/mnt/qdata/share/raecker1/ukbdata_70k/interim/ukb_kidney_preprocessed_masked.h5'
             load_abdominal_data(data, f'{key}/left', organ='kidney', contrast='wat', group='', ukb=True)
             load_abdominal_data(data, f'{key}/right', organ='kidney', contrast='wat', group='', ukb=True)"""
-            data = '/mnt/qdata/share/raecker1/ukbdata_70k/interim/ukb_lkd_preprocessed_masked'
+            data = '/mnt/qdata/share/raecker1/ukbdata_70k/interim/ukb_lkd_preprocessed'
             load_abdominal_data(data, key, organ='lkd', contrast='wat', group='', ukb=True)
-            data = '/mnt/qdata/share/raecker1/ukbdata_70k/interim/ukb_rkd_preprocessed_masked'
+            data = '/mnt/qdata/share/raecker1/ukbdata_70k/interim/ukb_rkd_preprocessed'
             load_abdominal_data(data, key, organ='rkd', contrast='wat', group='', ukb=True)
         elif organ == 'fundus':
             data = '/mnt/qdata/share/rakuest1/data/UKB/interim/ukb_fundus_preprocessed.h5'
