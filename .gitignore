@@ -1,6 +1,7 @@
 wandb/
 ukb_age_*/
 age/
+config/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
