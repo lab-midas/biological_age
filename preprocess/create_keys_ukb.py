@@ -31,6 +31,11 @@ def get_imaging_data(h5_path, output_dir, organ):
     fhandle = h5py.File(h5_path, 'r')
     if organ == 'brain' or organ == 'heart':
         group = fhandle['image']
+    elif 'fundus' in organ:
+        if 'left' in organ:
+            group = fhandle['left']
+        else:
+            group = fhandle['right']
     else:
         group = fhandle['water']
     keys = group.keys()
@@ -69,7 +74,7 @@ def create_train_test(key_file, output_dir, out_name):
     print(f'(4) split in train and test set for {organ}')
     keys = pd.read_csv(os.path.join(output_dir, 'keys', key_file), header=None)
     keys = keys[0].to_list()
-    keys = keys[:int(len(keys) * 0.85)]
+    #keys = keys[:int(len(keys) * 0.85)]
     create_keys(keys, output_dir, out_name, n_folds=1)
 
 
@@ -84,7 +89,6 @@ def get_full_test_set_keys(organ, output_dir, out_name):
     df_filtered = img_df[~img_df['key'].isin(set(img_wo_age['key']))]       # filter out images without age label
     df_out = df_filtered[~df_filtered['key'].isin(set(train_df['key']))]    # filter out images in train set
     test_key_list = df_out['key'].to_list()
-    #test_key_list = test_key_list[int(len(test_key_list) * 0.96):]
 
     with open(output_dir.joinpath('keys', f'full_test_{out_name}.dat'), 'w') as f:
         for key in test_key_list:
@@ -115,7 +119,7 @@ def get_gradcam_keys(organ, output_dir, key_file_out, out_name):
 if __name__ == '__main__':
     denbi = True
     #organs = ['brain', 'heart', 'kidneys', 'liver', 'spleen', 'pancreas']
-    organs = ['liver']
+    organs = ['brain']
     """h5_paths = [
         'ukb_brain_preprocessed.h5', 
         'ukb_heart_preprocessed.h5', 
@@ -124,7 +128,7 @@ if __name__ == '__main__':
         'ukb_spl_preprocessed.h5', 
         'ukb_pnc_preprocessed.h5'
     ]"""
-    h5_paths = ['ukb_liv_preprocessed.h5']
+    h5_paths = ['ukb_brain_preprocessed.h5']
     
     #csv_input = '/mnt/qdata/rawdata/NAKO_706/NAKO_706_META/30k/NAKO-707_export_baseline.csv'
     if denbi:
@@ -142,12 +146,14 @@ if __name__ == '__main__':
         else:
             output_dir = Path('/mnt/qdata/rawdata/UKBIOBANK/ukb_70k/interim')  # clinic
 
-        #h5_path = output_dir.joinpath(h5_paths[i])
+        # output_dir = Path('/mnt/qdata/share/rakuest1/data/UKB/interim')
+
+        h5_path = output_dir.joinpath(h5_paths[i])
 
         #get_imaging_data(h5_path, output_dir, organ)
         #get_images_wo_age_label(organ, csv_output, output_dir)
         #adjust_imaging_and_meta_data(organ, key_file, key_file_out, output_dir)
-        create_train_test(key_file_out, output_dir, out_name)
+        #create_train_test(key_file_out, output_dir, out_name)
         get_full_test_set_keys(organ, output_dir, out_name)
         #get_gradcam_keys(organ, output_dir, key_file_out, out_name)
 

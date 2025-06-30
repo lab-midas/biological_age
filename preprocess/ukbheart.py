@@ -596,10 +596,6 @@ def main():
 
     # run segmentation on whole cohort first to get shapes of segmentation masks
     nifti_files = [f for f in Path(input_dir).glob('*.nii.gz')]
-    #print(nifti_files.index(Path('/mnt/qdata/share/raecker1/ukbdata_70k/sa_heart/raw/4681366_2_sa.nii.gz')))
-    #print(nifti_files.index(Path('/mnt/qdata/share/raecker1/ukbdata_70k/sa_heart/raw/4682757_2_sa.nii.gz')))
-    #print(nifti_files.index(Path('/mnt/qdata/share/raecker1/ukbdata_70k/sa_heart/raw/4676659_2_sa.nii.gz')))
-    #nifti_files = nifti_files[nifti_files.index(Path('/mnt/qdata/share/raecker1/ukbdata_70k/sa_heart/raw/4676659_2_sa.nii.gz'))+1:]
     #nifti_files = nifti_files[nifti_files.index(Path('/mnt/qdata/share/raecker1/ukbdata_70k/sa_heart/raw/4637290_2_sa.nii.gz')):]
     print(f'segmenting {len(nifti_files)} images')
     segment_heart(nifti_files, save_path=save_path)

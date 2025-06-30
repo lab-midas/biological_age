@@ -19,6 +19,7 @@ trainer:
   #limit_val_batches: 0.25
   val_check_interval: 1.0
   #early_stop_callback: False
+  resume:
 
 model:
   norm: IN
@@ -49,8 +50,10 @@ dataset:
   preload: False
   init_load: False
   fold: 0
-  train: !ENV ${DATA}/UKB/interim/keys/train_fundus.dat
-  val:   !ENV ${DATA}/UKB/interim/keys/test_fundus.dat  # same as test.dat just with additional info if left/right fundus image of patient is available/taken
+  train: !ENV ${DATA}/UKB/interim/keys/train_fundus_mainly_healthy.dat
+  val:   !ENV ${DATA}/UKB/interim/keys/test_fundus_mainly_healthy.dat  # same as test.dat just with additional info if left/right fundus image of patient is available/taken
+  pred:  !ENV ${DATA}/interim/keys/full_test_fundus_mainly_healthy.dat
+  gradcam:  !ENV ${DATA}/interim/keys/gradcam_fundus_mainly_healthy.dat
   debug:
   #debug: !ENV ${DATA}/UKB/interim/keys/debug_fundus.dat
   data_augmentation: True

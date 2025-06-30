@@ -1,3 +1,4 @@
+import sys
 import os
 import time
 from pathlib import Path
@@ -15,8 +16,10 @@ from batchgenerators.transforms.spatial_transforms import MirrorTransform
 from batchgenerators.transforms.crop_and_pad_transforms import CenterCropTransform, RandomCropTransform
 from batchgenerators.transforms.abstract_transforms import Compose
 
-import sys
+
 sys.path.append('/home/raeckev1/nako_ukb_age')
+sys.path.append('/home/raecker1/nako_ukb_age')
+
 from brainage.model.model3d import AgeModel3DVolume
 from brainage.model.model2d import AgeModel2DChannels
 from brainage.dataset.dataset3d import BrainDataset, BrainPatchDataset, HeartDataset, AbdomenDataset

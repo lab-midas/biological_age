@@ -25,10 +25,10 @@ export PYTHONPATH=$PRJ
 #/opt/conda/raecker1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train3d.py --config $PRJ/config/volume/config_ukb_fundus.yaml --predict $PRJ/config/volume/config_predict.yaml
 #/opt/conda/raecker1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train3d.py --config $PRJ/config/volume/config_ukb_fundus_meta.yaml --predict $PRJ/config/volume/config_predict.yaml
 
-/opt/conda/raecker1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train3d.py --config $PRJ/config/volume/config_ukb_heart.yaml --predict $PRJ/config/volume/config_predict_healthy.yaml
+#/opt/conda/raecker1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train3d.py --config $PRJ/config/volume/config_ukb_heart.yaml --predict $PRJ/config/volume/config_predict_healthy.yaml
 #/opt/conda/raecker1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train3d.py --config $PRJ/config/volume/config_ukb_heart_meta.yaml --predict $PRJ/config/volume/config_predict.yaml
 
-#/opt/conda/raecker1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train3d.py --config $PRJ/config/volume/config_ukb_liver.yaml --predict $PRJ/config/volume/config_predict.yaml
+/opt/conda/raecker1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train3d.py --config $PRJ/config/volume/config_ukb_liver.yaml --predict $PRJ/config/volume/config_predict_mainly_healthy.yaml
 #/opt/conda/raecker1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train3d.py --config $PRJ/config/volume/config_ukb_liver_meta.yaml --predict $PRJ/config/volume/config_predict.yaml
 
 #/opt/conda/raecker1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train3d.py --config $PRJ/config/volume/config_ukb_kidney.yaml --predict $PRJ/config/volume/config_predict.yaml

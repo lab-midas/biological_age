@@ -19,6 +19,7 @@ trainer:
   #limit_val_batches: 0.25
   val_check_interval: 1.0
   #early_stop_callback: False
+  resume:
 
 model:
   norm: IN
@@ -46,7 +47,7 @@ dataset:
   group:
   info: !ENV ${DATA}/interim/ukb_all.csv
   column: age
-  preload: True
+  preload: False
   init_load: False
   fold: 0
   train: !ENV ${DATA}/interim/keys/train_liver_mainly_healthy.dat

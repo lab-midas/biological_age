@@ -16,7 +16,7 @@ checkpoints:
   ukb_kidney_volume_meta:
     - age/
   ukb_liver_volume:
-    - age/
+    - age/1o35r13h
   ukb_liver_volume_meta:
     - age/
   ukb_pancreas_volume:

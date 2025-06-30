@@ -22,6 +22,7 @@ from batchgenerators.transforms.crop_and_pad_transforms import CenterCropTransfo
 from batchgenerators.transforms.abstract_transforms import Compose
 
 sys.path.append('/home/raeckev1/nako_ukb_age')
+sys.path.append('/home/raecker1/nako_ukb_age')
 
 from brainage.model.model3d import AgeModel3DVolume
 from brainage.model.model2d import AgeModel2DChannels
@@ -247,6 +248,8 @@ def main():
     else:
         model = AgeModel3DVolume(cfg, ds_train, ds_val, offline_wandb, log_model, dataset)
 
+
+
     
     if not offline_wandb:
         # wandb.init(name=f'{job}-{job_id}', entity='lab-midas', project=project, config=args)
@@ -270,14 +273,14 @@ def main():
 
     else:  # train
         trainer = Trainer(logger=wandb_logger, accelerator='gpu', devices=cfg['trainer']['gpus'], max_epochs=cfg['trainer']['max_epochs'],
-                        benchmark=cfg['trainer']['benchmark'], val_check_interval=cfg['trainer']['val_check_interval'], strategy="ddp")
+                          benchmark=cfg['trainer']['benchmark'], val_check_interval=cfg['trainer']['val_check_interval'], strategy="ddp")
 
         if trainer.global_rank == 0 and not offline_wandb:
             wandb_logger[0].experiment.config.update(cfg)
-        # a = ds_train.__getitem__(0)
-        # print(a['key'])
-        # print(a['data'].shape)
-        trainer.fit(model)
+        if cfg['trainer']['resume'] is not None:
+            trainer.fit(model, ckpt_path=cfg['trainer']['resume'])
+        else:
+            trainer.fit(model)
 
 
 if __name__ == '__main__':

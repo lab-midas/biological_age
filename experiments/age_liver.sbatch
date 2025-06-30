@@ -4,7 +4,7 @@
 #SBATCH --partition=month
 #SBATCH --gpus=1
 #SBATCH --time 31-0
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=16
 #SBATCH --signal=SIGUSR1@90
 #SBATCH --nodelist=node-gpu-04
 #SBATCH --error=job.%J.%x.err

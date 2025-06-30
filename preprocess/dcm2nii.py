@@ -505,23 +505,6 @@ def nii_zipped_brain(zip_file, output_dir,
     output_dir.joinpath('n4_flirt_robex_fcm').mkdir(exist_ok=True)
     output_dir.joinpath('processed').mkdir(exist_ok=True)
 
-    '''
-    import matplotlib.pyplot as plt
-    import nibabel as nib
-
-    def plot_data(file):
-        a = nib.load(os.path.join(tmp.name, 'T1', file))
-        plt.imshow(a.get_fdata()[:, :, 100])
-        plt.title(file)
-        plt.show()
-    plot_data('T1_brain_mask.nii.gz')
-    plot_data('T1_unbiased_brain.nii.gz')
-    plot_data('T1.nii.gz')
-    plot_data('T1_brain.nii.gz')
-    plot_data('T1_orig_defaced.nii.gz')
-    plot_data('T1_brain_to_MNI.nii.gz')
-    '''
-
     try:
         # get corresponding nifti
         shutil.move(os.path.join(tmp.name, 'T1', 'T1.nii.gz'), output_dir.joinpath('raw', subj_id + '_' + run_id + '_T1.nii.gz'))
@@ -865,19 +848,10 @@ if __name__ == '__main__':
                 nii_zipped_la_heart(f, out_dir, args.id, args.singledir, args.csv, args.verbose)
 
 
-    # single process version
-    # t = time.time()
-    # for f in zip_dir.glob('*.zip'):
-    #    process_file(f)
-    # elapsed_time = time.time() - t
-
     file_list = list(zip_dir.glob('*.zip'))
     #start_index = file_list.index(zip_dir.joinpath('110679_30_3D_GRE_TRA_W_COMPOSED.zip'))
     #start_index = 280
     #file_list = file_list[start_index+1:]
-    #print(f'processing {len(file_list)} files')
-    #print(f'start with id: {start_index+1}')
-
 
     # multiprocessing
     num_cores = 10
@@ -887,6 +861,8 @@ if __name__ == '__main__':
     print(f'using {num_cores} CPU cores')
 
     t = time.time()
+
+    # debug, single processing
     #for f in file_list:
     #    process_file(f)
         
@@ -895,11 +871,3 @@ if __name__ == '__main__':
 
     print(f'elapsed time: {time.strftime("%H:%M:%S", time.gmtime(elapsed_time))}')
 
-
-    '''
-    - CSV file already available
-    - Age at recruitment at Data-Field 21022: 
-    csv = pd.read_csv('/mnt/qdata/rawdata/UKBIOBANK/ukbdata/ukb46167.csv', nrows=50)
-    ages = csv.loc[:, csv.columns.str.contains('21022')]
-    
-    '''

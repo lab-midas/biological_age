@@ -47,6 +47,7 @@ class AgeModel2DSlices(pl.LightningModule):
         # datasets
         self.train_ds = train_ds
         self.val_ds = val_ds
+        self.val_outs = []
         # grad cam 
         self.gradient = None
 
@@ -129,14 +130,17 @@ class AgeModel2DSlices(pl.LightningModule):
         pos = batch['position'].float()
         y_hat = self(x, pos=pos)
         loss, y_pred = self.loss_criterion(y_hat, y)
+        mse = F.mse_loss(y_pred, y)
+        mae = F.l1_loss(y_pred, y)
+        self.val_outs.append({'val_loss': loss, 'mse': mse, 'mae': mae})
         return {'val_loss': loss,
-                'mse': F.mse_loss(y_pred, y), 
-                'mae': F.l1_loss(y_pred, y)}  
+                'mse': mse, 
+                'mae': mae}  
 
-    def on_validation_epoch_end(self, outputs):
-        avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
-        avg_mae = torch.stack([x['mae'] for x in outputs]).mean()
-        avg_mse = torch.stack([x['mse'] for x in outputs]).mean()
+    def on_validation_epoch_end(self):
+        avg_loss = torch.stack([x['val_loss'] for x in self.val_outs]).mean()
+        avg_mae = torch.stack([x['mae'] for x in self.val_outs]).mean()
+        avg_mse = torch.stack([x['mse'] for x in self.val_outs]).mean()
         logs = {'val_loss': avg_loss, 'mae': avg_mae, 'mse': avg_mse}
         return {'val_loss': avg_loss, 'log': logs}
 
@@ -182,6 +186,7 @@ class AgeModel2DChannels(pl.LightningModule):
         self.strides = cfg['model']['strides']
         self.train_ds = train_ds
         self.val_ds = val_ds
+        self.val_outs = []
         self.no_max_pool = cfg['model']['no_max_pool'] or False
         self.offline_wandb = offline_wandb
         self.log_model = log_model
@@ -251,14 +256,15 @@ class AgeModel2DChannels(pl.LightningModule):
         self.log("validation/loss", loss)
         self.log('mse', mse)
         self.log('mae', mae)
+        self.val_outs.append({'val_loss': loss, 'mse': mse, 'mae': mae})
         return {'val_loss': loss,
                 'mse': mse,
                 'mae': mae}
 
-    def on_validation_epoch_end(self, outputs):
-        avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
-        avg_mae = torch.stack([x['mae'] for x in outputs]).mean()
-        avg_mse = torch.stack([x['mse'] for x in outputs]).mean()
+    def on_validation_epoch_end(self):
+        avg_loss = torch.stack([x['val_loss'] for x in self.val_outs]).mean()
+        avg_mae = torch.stack([x['mae'] for x in self.val_outs]).mean()
+        avg_mse = torch.stack([x['mse'] for x in self.val_outs]).mean()
         logs = {'val_loss': avg_loss, 'mae': avg_mae, 'mse': avg_mse}
         return {'val_loss': avg_loss, 'log': logs, 'progress_bar': logs}
 
