@@ -261,7 +261,12 @@ def main():
     if args.predict is not None:
         ckpt_config = loadYaml(args.predict)
         ckpt_path = os.path.join(os.environ['CKPT'], ckpt_config['checkpoints'][job][0], 'checkpoints')
-        ckpt_path = [os.path.join(ckpt_path, f) for f in os.listdir(ckpt_path) if f.endswith('.ckpt') and f.startswith('epoch=199')]
+        if 'val' in os.environ['OUT']:
+            ckpt_path = [os.path.join(ckpt_path, f) for f in os.listdir(ckpt_path) if f.endswith('.ckpt') and f.startswith('best-val-loss')]
+            print(f'Loading best validation loss checkpoint from {ckpt_path[0]}')
+        else:
+            ckpt_path = [os.path.join(ckpt_path, f) for f in os.listdir(ckpt_path) if f.endswith('epoch=199.ckpt')]
+            print(f'Loading last epoch checkpoint from {ckpt_path[0]}')
         model.load_state_dict(torch.load(str(ckpt_path[0]))['state_dict'])
         trainer = Trainer(accelerator='gpu', devices=1, strategy="ddp")  # cfg['trainer']['gpus']
         trainer.predict(model, model.dataloader(ds_val))
@@ -275,7 +280,7 @@ def main():
     else:  # train
         # Define checkpoint directory
         ckpt_dir = os.environ.get('CKPT', 'checkpoints')
-        checkpoint_dir = os.path.join(ckpt_dir, f'{job}-{job_id}')
+        checkpoint_dir = os.path.join(ckpt_dir, 'checkpoints', f'{job}-{job_id}')
         
         print(f'Checkpoints will be saved to: {checkpoint_dir}')
         
