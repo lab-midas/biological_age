@@ -261,12 +261,12 @@ def main():
     if args.predict is not None:
         ckpt_config = loadYaml(args.predict)
         ckpt_path = os.path.join(os.environ['CKPT'], ckpt_config['checkpoints'][job][0], 'checkpoints')
-        if 'val' in os.environ['OUT']:
+        if 'best' in os.environ['OUT']:
             ckpt_path = [os.path.join(ckpt_path, f) for f in os.listdir(ckpt_path) if f.endswith('.ckpt') and f.startswith('best-val-loss')]
-            print(f'Loading best validation loss checkpoint from {ckpt_path[0]}')
+            print(f'Loading best model checkpoint from {ckpt_path[0]}')
         else:
             ckpt_path = [os.path.join(ckpt_path, f) for f in os.listdir(ckpt_path) if f.endswith('epoch=199.ckpt')]
-            print(f'Loading last epoch checkpoint from {ckpt_path[0]}')
+            print(f'Loading last model checkpoint from {ckpt_path[0]}')
         model.load_state_dict(torch.load(str(ckpt_path[0]))['state_dict'])
         trainer = Trainer(accelerator='gpu', devices=1, strategy="ddp")  # cfg['trainer']['gpus']
         trainer.predict(model, model.dataloader(ds_val))
