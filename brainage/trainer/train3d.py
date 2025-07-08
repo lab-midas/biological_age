@@ -261,7 +261,9 @@ def main():
     if args.predict is not None:
         ckpt_config = loadYaml(args.predict)
         ckpt_path = os.path.join(os.environ['CKPT'], ckpt_config['checkpoints'][job][0], 'checkpoints')
-        if 'best' in os.environ['OUT']:
+        print(os.environ['OUT'])
+        print(type(os.environ['OUT']))
+        if 'best' in str(os.environ['OUT']):
             ckpt_path = [os.path.join(ckpt_path, f) for f in os.listdir(ckpt_path) if f.endswith('.ckpt') and f.startswith('best-val-loss')]
             print(f'Loading best model checkpoint from {ckpt_path[0]}')
         else:
@@ -280,7 +282,7 @@ def main():
     else:  # train
         # Define checkpoint directory
         ckpt_dir = os.environ.get('CKPT', 'checkpoints')
-        checkpoint_dir = os.path.join(ckpt_dir, 'checkpoints', f'{job}-{job_id}')
+        checkpoint_dir = os.path.join(ckpt_dir, f'{job}-{job_id}', 'checkpoints')
         
         print(f'Checkpoints will be saved to: {checkpoint_dir}')
         
