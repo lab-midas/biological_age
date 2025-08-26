@@ -1,8 +1,4 @@
-import os
-from pathlib import Path
-
 import torch
-# import dotenv
 import wandb
 import pandas as pd
 import numpy as np
@@ -13,10 +9,9 @@ from torch.utils.data import DataLoader
 from omegaconf import OmegaConf
 
 from brainage.model.loss import class_loss, l2_loss
-#from brainage.dataset.dataset2d import SliceDataset
 from brainage.model.architecture.resnet2d import generate_model
 
-# TODO upload checkpoints
+
 class AgeModel2DSlices(pl.LightningModule):
 
     def __init__(self,
@@ -149,12 +144,22 @@ class AgeModel2DSlices(pl.LightningModule):
 
     def train_dataloader(self):
         dataset = self.train_ds
-        loader = DataLoader(dataset, batch_size=self.batch_size, num_workers=self.num_workers, drop_last=True, shuffle=True, pin_memory=True)
+        loader = DataLoader(dataset, 
+                            batch_size=self.batch_size, 
+                            num_workers=self.num_workers, 
+                            drop_last=True, 
+                            shuffle=True, 
+                            pin_memory=True)
         return loader
     
     def val_dataloader(self):
         dataset = self.val_ds
-        loader = DataLoader(dataset, batch_size=self.batch_size, num_workers=self.num_workers, drop_last=True, shuffle=False, pin_memory=True)
+        loader = DataLoader(dataset, 
+                            batch_size=self.batch_size, 
+                            num_workers=self.num_workers, 
+                            drop_last=True, 
+                            shuffle=False, 
+                            pin_memory=True)
         return loader
 
 
@@ -295,16 +300,29 @@ class AgeModel2DChannels(pl.LightningModule):
 
     def train_dataloader(self):
         dataset = self.train_ds
-        loader = DataLoader(dataset, batch_size=self.batch_size, num_workers=self.num_workers, drop_last=True,
-                            shuffle=True, pin_memory=True)
+        loader = DataLoader(dataset, 
+                            batch_size=self.batch_size, 
+                            num_workers=self.num_workers, 
+                            drop_last=True,
+                            shuffle=True, 
+                            pin_memory=True)
         return loader
 
     def val_dataloader(self):
         dataset = self.val_ds
-        loader = DataLoader(dataset, batch_size=self.batch_size, num_workers=self.num_workers, drop_last=True,
-                            shuffle=False, pin_memory=True)
+        loader = DataLoader(dataset, 
+                            batch_size=self.batch_size, 
+                            num_workers=self.num_workers, 
+                            drop_last=True,
+                            shuffle=False, 
+                            pin_memory=True)
         return loader
 
     def dataloader(self, dataset):
-        loader = DataLoader(dataset, batch_size=1, num_workers=self.num_workers, drop_last=False, shuffle=False, pin_memory=True)
+        loader = DataLoader(dataset, 
+                            batch_size=1, 
+                            num_workers=self.num_workers, 
+                            drop_last=False, 
+                            shuffle=False, 
+                            pin_memory=True)
         return loader

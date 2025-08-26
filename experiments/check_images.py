@@ -1,10 +1,7 @@
 import matplotlib.pyplot as plt
 import os
-import tqdm
 import h5py
-import pandas as pd
 import numpy as np
-from pathlib import Path
 
 
 def load_brain_data(data, key, group, ukb=True):
@@ -84,8 +81,8 @@ def load_fundus_data(data, key):
     plt.imsave(f'/home/raecker1/test/{key}_{group_str[:-1]}_fundus.png', data)
 
 if __name__ == '__main__':
-    organ = 'heart'
-    keys = ['1077826', '1002035', '1002551', '1008408', '1008801', '5143978', '4964011']
+    organ = 'brain'
+    keys = ['1249236', '3265960', '3841505']
     #key = '4675538'
     """keys = ['2837023', '3753282', '4803283', '4663445', '2693985', '1839110', '4525038', 
             '4451253', '5923528', '2693186', '3987000', '5857948', '1421691', '1608783', 

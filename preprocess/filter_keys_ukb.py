@@ -1,8 +1,5 @@
 import pandas as pd
-import seaborn as sns
 import csv
-import pyarrow
-import dask.dataframe as dd
 
 organ_key_list = ['20209']
 icd_list = ['41270', '41271', '41202', '41203', '41204', '41205', '41201']
@@ -30,19 +27,52 @@ def get_full_cols(keys, id_list):
     return list_cols
 
 
+def filter_healthy_keys(df, icd_cols_list):
+    """
+    Filters the keys of subjects with no ICD-Codes and imaging data of organ.
+    """
+    # only subjects with no ICD-Codes
+    df_filt = df[df[icd_cols_list].isna().all(axis=1)]
+    print(len(df_filt))
+    return df_filt
+
+
+def filter_mainly_healthy_keys(df, icd_cols_list, diseases_list):
+    """
+    Filters the keys of subjects without specific ICD-Codes.
+    """
+    def starts_with_any(string, prefixes):
+        return any(string.startswith(prefix) for prefix in prefixes)
+    
+    mask = df[icd_cols_list].applymap(lambda x: starts_with_any(str(x), diseases_list))
+    df_filt = df[~mask.any(axis=1)]
+    print(len(df_filt))
+    
+    # get mainly healthy subjects
+    df_filt_mainly_healthy = df_filt[~df_filt[icd_cols_list].isin(diseases_list).any(axis=1)]
+    print(len(df_filt_mainly_healthy))
+    
+    return df_filt_mainly_healthy
+    
+
+
 if __name__ == '__main__':
-    df_first = pd.read_csv('C:/Users/Veronika Ecker/Documents/nako_ukb_age/ukb675384.csv', nrows=1)
+    img_csv_path = '/mnt/qdata/rawdata/UKBIOBANK/ukbdata_70k/ukb675384.csv'
+    gen_csv_path = '/mnt/qdata/rawdata/UKBIOBANK/baskets/4053862/ukb677731.csv'
+    save_path = '/mnt/qdata/rawdata/UKBIOBANK/baskets/4053862/ukb_keys_prescan_brain.csv'
+
+    df_first = pd.read_csv(img_csv_path, nrows=1)
     chunk_list = []
     keys = df_first.keys()
     icd_cols_list = get_full_cols(keys, icd_list)
     organ_cols_list = get_full_cols(keys, organ_key_list)
 
-    df_first = pd.read_csv('C:/Users/Veronika Ecker/Documents/nako_ukb_age/ukb675384.csv', nrows=1)
+    df_first = pd.read_csv(img_csv_path, nrows=1)
     keys = df_first.keys()
     organ_cols_list = get_full_cols(keys, organ_key_list)
 
-    df_icd = pd.read_csv('C:/Users/Veronika Ecker/Documents/nako_ukb_age/Data/ukb677731.csv', usecols=['eid']+icd_cols_list)
-    df_img = pd.read_csv('C:/Users/Veronika Ecker/Documents/nako_ukb_age/ukb675384.csv', usecols=['eid']+organ_cols_list)
+    df_icd = pd.read_csv(gen_csv_path, usecols=['eid']+icd_cols_list)
+    df_img = pd.read_csv(img_csv_path, usecols=['eid']+organ_cols_list)
 
     df_cols = pd.merge(df_icd, df_img, on='eid', how='inner')
     #df_cols = pd.read_csv('C:/Users/Veronika Ecker/Documents/nako_ukb_age/ukb675384.csv', usecols=['eid']+icd_cols_list+organ_cols_list) 
@@ -53,24 +83,14 @@ if __name__ == '__main__':
     df_filt = df_cols[df_cols[organ_cols_list].notna().any(axis=1)]
     print(len(df_filt))
 
-    # only subjects with no ICD-Codes
-    df_filt = df_filt[df_filt[icd_cols_list].isna().all(axis=1)]
-    print(len(df_filt))
+    df_filt = filter_mainly_healthy_keys(df_filt, icd_cols_list, diseases_list)
 
-    # only subjects without specific ICD-Codes
-    def starts_with_any(string, prefixes):
-        return any(string.startswith(prefix) for prefix in prefixes)
-    #mask = df_filt[icd_cols_list].applymap(lambda x: starts_with_any(str(x), diseases_list))
-    #df_filt = df_filt[~mask.any(axis=1)]
-    #df_filt = df_filt[~df_filt[icd_cols_list].isin(diseases_list).any(axis=1)]
-    #print(len(df_filt))
-
-    with open('C:/Users/Veronika Ecker/Documents/nako_ukb_age/Data/ukb_keys_healthy_heart.csv', "w", newline="") as csv_file:
+    """with open(save_path, "w", newline="") as csv_file:
         cwriter = csv.writer(csv_file, delimiter=',')
         for key in list(df_filt['eid']):
-            cwriter.writerow([key])
+            cwriter.writerow([key])"""
         #ax = sns.histplot(data=df_out, x='21022-0.0', kde=True, binwidth=1)
         #ax.figure.savefig('C:/Users/Veronika Ecker/Documents/nako_ukb_age/results_true_age/age_dist_pancreas_wodis.png', bbox_inches="tight")
-        subject_count = len(df_filt.index)
-        print(f'No: {subject_count}')
+        #subject_count = len(df_filt.index)
+        #print(f'No: {subject_count}')
     

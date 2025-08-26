@@ -2,6 +2,11 @@ wandb/
 ukb_age_*/
 age/
 config/
+experiments/
+notebooks/
+preprocess/
+postprocess/
+log/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -26,6 +31,7 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+.conda/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

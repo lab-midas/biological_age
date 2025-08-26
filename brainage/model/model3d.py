@@ -1,19 +1,12 @@
-import logging
-from pathlib import Path
-
 import wandb
 import torch
-import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import pytorch_lightning as pl
-#from omegaconf import OmegaConf
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 
 from brainage.model.loss import l2_loss
 from brainage.model.architecture.resnet3d import generate_model
-#from brainage.model.architecture.simple import SimpleCNN
 
 
 class AgeModel3DVolume(pl.LightningModule):
@@ -29,7 +22,6 @@ class AgeModel3DVolume(pl.LightningModule):
         super().__init__()
 
         # copy over
-        #self.hparams = hparams
         self.model_depth = cfg['model']['depth'] or 18
         self.inputs = cfg['model']['inputs'] or 3
         self.outputs = cfg['model']['outputs'] or 1
@@ -157,14 +149,29 @@ class AgeModel3DVolume(pl.LightningModule):
 
     def train_dataloader(self):
         dataset = self.train_ds
-        loader = DataLoader(dataset, batch_size=self.batch_size, num_workers=self.num_workers, drop_last=True, shuffle=True, pin_memory=True)
+        loader = DataLoader(dataset, 
+                            batch_size=self.batch_size, 
+                            num_workers=self.num_workers, 
+                            drop_last=True, 
+                            shuffle=True, 
+                            pin_memory=True)
         return loader
     
     def val_dataloader(self):
         dataset = self.val_ds
-        loader = DataLoader(dataset, batch_size=self.batch_size, num_workers=self.num_workers, drop_last=True, shuffle=False, pin_memory=True)
+        loader = DataLoader(dataset, 
+                            batch_size=self.batch_size, 
+                            num_workers=self.num_workers, 
+                            drop_last=True, 
+                            shuffle=False, 
+                            pin_memory=True)
         return loader
 
     def dataloader(self, dataset):
-        loader = DataLoader(dataset, batch_size=1, num_workers=self.num_workers, drop_last=False, shuffle=False, pin_memory=True)
+        loader = DataLoader(dataset, 
+                            batch_size=1, 
+                            num_workers=self.num_workers, 
+                            drop_last=False, 
+                            shuffle=False, 
+                            pin_memory=True)
         return loader

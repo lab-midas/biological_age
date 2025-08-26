@@ -1,6 +1,7 @@
 import torch
 from torch.nn import functional as F
 
+
 class class_loss(torch.nn.Module):
 
     def __init__(self, label_range=[20.0, 80.0], label_step=2.5):
