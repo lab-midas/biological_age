@@ -1,3 +1,4 @@
+# import os
 import torch
 import wandb
 import pandas as pd
@@ -10,7 +11,6 @@ from omegaconf import OmegaConf
 
 from brainage.model.loss import class_loss, l2_loss
 from brainage.model.architecture.resnet2d import generate_model
-
 
 class AgeModel2DSlices(pl.LightningModule):
 

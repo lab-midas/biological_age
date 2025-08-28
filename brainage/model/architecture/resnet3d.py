@@ -1,9 +1,9 @@
+# import os
 from functools import partial
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 # resnet reference: https://github.com/kenshohara/3D-ResNets-PyTorch/blob/master/models/resnet.py
-
 
 class PixelNorm3d(nn.Module):
     # noinspection PyUnusedLocal

@@ -1,3 +1,4 @@
+# import os
 import sys
 import os
 from pathlib import Path
@@ -10,7 +11,6 @@ from batchgenerators.transforms.color_transforms import GammaTransform
 from batchgenerators.transforms.spatial_transforms import MirrorTransform
 from batchgenerators.transforms.crop_and_pad_transforms import CenterCropTransform, RandomCropTransform
 from batchgenerators.transforms.abstract_transforms import Compose
-
 
 sys.path.append('/home/raeckev1/nako_ukb_age')
 sys.path.append('/home/raecker1/nako_ukb_age')

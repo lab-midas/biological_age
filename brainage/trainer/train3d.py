@@ -1,8 +1,8 @@
+# import os
 import os
 import sys
 import time
 from pathlib import Path
-
 import torch
 import numpy as np
 from pytorch_lightning import Trainer, seed_everything
@@ -22,7 +22,6 @@ from brainage.model.model2d import AgeModel2DChannels
 from brainage.dataset.dataset3d import BrainDataset, BrainPatchDataset, HeartDataset, AbdomenDataset
 from brainage.dataset.dataset2d import FundusDataset
 from brainage.utils import train_args, loadYaml
-
 
 config = os.getenv('CONFIG')
 

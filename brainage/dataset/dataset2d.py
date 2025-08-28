@@ -1,3 +1,4 @@
+# import os
 from pathlib import Path
 import logging
 import collections
@@ -8,7 +9,6 @@ import pandas as pd
 from torch.utils.data import Dataset as AbstractDataset
 dotenv.load_dotenv()
 from tqdm import tqdm
-
 
 class FundusDataset(AbstractDataset):
     def __init__(self,

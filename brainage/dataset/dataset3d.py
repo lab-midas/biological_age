@@ -7,7 +7,6 @@ import pandas as pd
 from tqdm import tqdm
 from torch.utils.data import Dataset as AbstractDataset
 
-
 class BrainDataset(AbstractDataset):
     def __init__(self,
                  data,

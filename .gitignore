@@ -1,3 +1,4 @@
+# gitignore
 wandb/
 ukb_age_*/
 age/
@@ -10,6 +11,7 @@ log/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
+
 
 # C extensions
 *.so

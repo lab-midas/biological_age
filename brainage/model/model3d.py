@@ -1,3 +1,4 @@
+# import os
 import wandb
 import torch
 import pandas as pd
@@ -7,7 +8,6 @@ from torch.utils.data import DataLoader
 
 from brainage.model.loss import l2_loss
 from brainage.model.architecture.resnet3d import generate_model
-
 
 class AgeModel3DVolume(pl.LightningModule):
 

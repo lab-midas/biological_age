@@ -5,7 +5,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 # resnet reference: https://github.com/kenshohara/3D-ResNets-PyTorch/blob/master/models/resnet.py
 
-
 class PixelNorm2d(nn.Module):
     # noinspection PyUnusedLocal
     def __init__(self, num_features, eps=1E-8, *args, **kwargs):

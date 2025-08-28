@@ -3,7 +3,6 @@ import yaml
 import re
 import os
 
-
 def loadYaml(cfile, experiment=None):
     """
     [SOURCE] https://medium.com/swlh/python-yaml-configuration-with-environment-variables-parsing-77930f4273ac
