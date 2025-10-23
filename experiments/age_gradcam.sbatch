@@ -19,11 +19,11 @@ module load cuda/11.3
 cd $PRJ
 export PYTHONPATH=$PRJ
 # MIDASGPUWorker env: optox, denbi: nakoukb
-#/opt/conda/raecker1/envs/bio_age/bin/python $PRJ/experiments/gradcam_volume_ukb.py --config $PRJ/config/volume/config_ukb_brain.yaml --predict $PRJ/config/volume/config_predict.yaml
-#/opt/conda/raecker1/envs/bio_age/bin/python $PRJ/experiments/gradcam_volume_ukb.py --config $PRJ/config/volume/config_ukb_fundus.yaml --predict $PRJ/config/volume/config_predict.yaml
-#/opt/conda/raecker1/envs/nakoukb/bin/python $PRJ/experiments/gradcam_volume.py --config $PRJ/config/volume/config_ukb_brain.yaml --predict $PRJ/config/volume/config_predict_mainly_healthy.yaml
-/opt/conda/raecker1/envs/nakoukb/bin/python $PRJ/experiments/gradcam_volume.py --config $PRJ/config/volume/config_ukb_brain.yaml --predict $PRJ/config/volume/config_predict_mainly_healthy.yaml
-#/opt/conda/raecker1/envs/nakoukb/bin/python $PRJ/experiments/gradcam_volume_ukb.py --config $PRJ/config/volume/config_ukb_liver.yaml --predict $PRJ/config/volume/config_predict.yaml
-#/opt/conda/raecker1/envs/nakoukb/bin/python $PRJ/experiments/gradcam_volume_ukb.py --config $PRJ/config/volume/config_ukb_kidney.yaml --predict $PRJ/config/volume/config_predict.yaml
-#/opt/conda/raecker1/envs/nakoukb/bin/python $PRJ/experiments/gradcam_volume_ukb.py --config $PRJ/config/volume/config_ukb_pancreas.yaml --predict $PRJ/config/volume/config_predict.yaml
-#/opt/conda/raecker1/envs/nakoukb/bin/python $PRJ/experiments/gradcam_volume_ukb.py --config $PRJ/config/volume/config_ukb_spleen.yaml --predict $PRJ/config/volume/config_predict.yaml
+#/opt/conda/raecker1/envs/bio_age/bin/python $PRJ/experiments/gradcam_ukb.py --config $PRJ/config/volume/config_ukb_brain.yaml --predict $PRJ/config/volume/config_predict.yaml
+#/opt/conda/raecker1/envs/bio_age/bin/python $PRJ/experiments/gradcam_ukb.py --config $PRJ/config/volume/config_ukb_fundus.yaml --predict $PRJ/config/volume/config_predict.yaml
+#/opt/conda/raecker1/envs/nakoukb/bin/python $PRJ/experiments/gradcam.py --config $PRJ/config/volume/config_ukb_brain.yaml --predict $PRJ/config/volume/config_predict_mainly_healthy.yaml
+/opt/conda/raecker1/envs/nakoukb/bin/python $PRJ/experiments/gradcam.py --config $PRJ/config/volume/config_ukb_brain.yaml --predict $PRJ/config/volume/config_predict_mainly_healthy.yaml
+#/opt/conda/raecker1/envs/nakoukb/bin/python $PRJ/experiments/gradcam_ukb.py --config $PRJ/config/volume/config_ukb_liver.yaml --predict $PRJ/config/volume/config_predict.yaml
+#/opt/conda/raecker1/envs/nakoukb/bin/python $PRJ/experiments/gradcam_ukb.py --config $PRJ/config/volume/config_ukb_kidney.yaml --predict $PRJ/config/volume/config_predict.yaml
+#/opt/conda/raecker1/envs/nakoukb/bin/python $PRJ/experiments/gradcam_ukb.py --config $PRJ/config/volume/config_ukb_pancreas.yaml --predict $PRJ/config/volume/config_predict.yaml
+#/opt/conda/raecker1/envs/nakoukb/bin/python $PRJ/experiments/gradcam_ukb.py --config $PRJ/config/volume/config_ukb_spleen.yaml --predict $PRJ/config/volume/config_predict.yaml

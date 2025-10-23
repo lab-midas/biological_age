@@ -2,49 +2,80 @@ import os
 import h5py
 from tqdm import tqdm
 import numpy as np
-import tempfile
-import re
-import shutil
 import time
 import subprocess
 import argparse
-import tempfile
 from pathlib import Path
-import dicom2nifti
-from zipfile import ZipFile
 import SimpleITK as sitk
 import nibabel as nib
 import intensity_normalization
-import matplotlib.pyplot as plt
 from nipype.interfaces import fsl
 
 
-def convert_nifti_h5(input_dir, output_dir, output_file,verbose=False):
+def write_keys(key_path, keys):
+
+    with open(key_path, 'w') as f:
+        for key in keys:
+            f.write(key + '\n')
+    print(f'Keys written to {key_path}')
+
+
+def convert_nifti_h5(input_dir, h5_dir, key_path, output_file, verbose=False):
     """
     Converts all nifti files in input_dir to h5 files in output_dir
+    Args:
+        input_dir (Path): input directory with nifti files
+        h5_dir (Path): output directory to store h5 file
+        key_path (Path): output dat file to store keys
+        output_file (str): output h5 file name
+        verbose (bool): print progress
     """
 
     # Create output directory if it does not exist
-    #output_dir.mkdir(exist_ok=True)
+    h5_dir.mkdir(exist_ok=True)
 
     # Get list of all nifti files in input_dir
     nifti_files = [f for f in input_dir.glob('*')]
 
     # Create list of all h5 files in output_dir
-    h5_file = output_dir.joinpath(output_file)
+    h5_path = h5_dir.joinpath(output_file)
 
+    if os.path.exists(h5_path):
+        print('{} already exists'.format(h5_path))
+        if os.path.exists(key_path):
+            print(f'Image keys already exist in {key_path}.')
+            return
+        else:
+            print(f'Image keys do not exist in {key_path}. Creating keys file.')
+            keys = []
+
+            hf = h5py.File(h5_path, 'r')
+            for key in hf['image'].keys():
+                keys.append(key.split('_')[0])
+            hf.close()
+
+            keys = list(set(keys))
+            write_keys(key_path, keys)
+
+            return
+        
     keys = []
-    hf = h5py.File(h5_file, 'w')
+    hf = h5py.File(h5_path, 'w')
     grp_image = hf.create_group('image')
     grp_affine = hf.create_group('affine')
 
     for nifti_file in tqdm(nifti_files):
         file_key = nifti_file.stem
+
+        # Load image
         img = nib.load(nifti_file.joinpath(nifti_file, 'n4_flirt_robex_fcm', file_key + '_n4_flirt_fcmnorm.nii.gz'))
         img_data = img.get_fdata().astype(np.float32)
+        # Load mask and apply to image
         mask = nib.load(nifti_file.joinpath(nifti_file, 'n4_flirt_robex_fcm', file_key + '_n4_flirt_robexmask.nii.gz'))
         mask_data = mask.get_fdata().astype(np.float32)
+
         img_data = np.multiply(img_data, mask_data)
+
         affine = img.affine.astype(np.float16)
         keyh5 = file_key.split('_')[0]
 
@@ -58,12 +89,16 @@ def convert_nifti_h5(input_dir, output_dir, output_file,verbose=False):
 
         key = keyh5.split('_')[0]
         keys.append(key)
+
         img = None
         img_data = None
         affine = None
     hf.close()
 
-    return keys
+    print(f'Wrote {len(keys)} nifti files to {h5_path}.')
+    
+    keys = list(set(keys))
+    write_keys(key_path, keys)
 
 
 def n4_bias_field_correction(input_file,
@@ -191,6 +226,21 @@ def process_brain_t1(input_file,
                      robex_dir='/mnt/qdata/software/robex',
                      split=0,
                      verbose=False):
+    """Preprocessing pipeline for brain T1 MRI data.
+    Steps:
+    1) N4 bias field correction
+    2) FLIRT MNI152 coregistration
+    3) ROBEX skull stripping
+    4) FCM WM intensity normalization
+    Args:
+        input_file (str/Path): input file (nii.gz)
+        output_dir (str/Path): output directory to store processed files.
+        reference_file (str/Path, optional): MNI152-1mm reference .nii.gz file. Defaults to '/mnt/qdata/software/fsl/ref/MNI152_T1_1mm.nii.gz'.
+        robex_dir (str/Path, optional): ROBEX installation directory. Defaults to '/mnt/qdata/software/robex'.
+        split (int, optional): (<0) process full pipeline, (0) only bias field corrections, or (1) full pipeline except bias field corrections.
+        verbose (bool, optional): print progress. Defaults to False.
+    """
+    
     print(split)
     input_file = Path(input_file)
     reference_file = Path(reference_file)
@@ -211,13 +261,10 @@ def process_brain_t1(input_file,
     print('(n4) bias field correction ...')
     n4_file = output_dir.joinpath(
         'n4_flirt', input_file.name.replace('.nii.gz', '_n4.nii.gz'))
-    # split < -1 process the whole pipeline at once
-    # split == 0 bias field corrections only ...
+
     if split <= 0:
         n4_bias_field_correction(input_file, n4_file)
 
-    # split < -1 process the whole pipeline at once
-    # split == 1 continue with coregistration ...
     if split < 0 or split == 1:
         # mni coregistration
         print('(fsl-flirt) mni template registration ...')
@@ -267,69 +314,48 @@ def main():
                                                  'N4 bias field correction\n' \
                                                  'FLIRT MNI152 coregistration\n' \
                                                  'ROBEX skull stripping\n' \
-                                                 'FCM WM intensity normalization')
+                                                 'FCM WM intensity normalization\n' \
+                                                 'Converts nifti files to h5 file.')
     parser.add_argument('input_dir', help='Input directory with files (T1w brain MRI, .nii.gz)')
     parser.add_argument('output_dir', help='Output directory to store processed files.')
-    parser.add_argument('--h5_dir', help='Directory to store h5 file', default='/mnt/qdata/share/raeckev1/nako_30k/interim/')
-    parser.add_argument('--reference', help='MNI152-1mm reference .nii.gz file')
-    parser.add_argument('--robex', help='ROBEX installation directory.')
+    parser.add_argument('--h5_dir', help='Directory to store h5 file', default='/mnt/qdata/share/raecker1/nako_30k/interim/')
+    parser.add_argument('--h5_file', help='Output h5 file to store processed files.', default='nako_brain_preprocessed.h5')
+    parser.add_argument('--key_file', help='Output csv file to store keys.', default='brain_imaging.dat')
+    parser.add_argument('--reference', help='MNI152-1mm reference .nii.gz file', default='/mnt/qdata/software/fsl/ref/MNI152_T1_1mm.nii.gz')
+    parser.add_argument('--robex', help='ROBEX installation directory.', default='/mnt/qdata/software/robex')
     parser.add_argument('--split',
                         help='Split bias field correction (0) from the followings steps (1). Process at once (-1).',
-                        type=int)
+                        type=int,
+                        default=0)
     parser.add_argument('-v', '--verbose', action='store_true')
     args = parser.parse_args()
+
+    input_dir = Path(args.input_dir)
+    output_dir = Path(args.output_dir)
+
+    h5_dir = Path(args.h5_dir)
+    key_path = h5_dir.joinpath('keys', args.key_file)
+    output_file = args.h5_file
 
     if args.verbose:
         print(Path(args.input_file).name)
 
-    reference_file = '/mnt/qdata/software/fsl/ref/MNI152_T1_1mm.nii.gz'
-    if args.reference:
-        reference_file = args.reference
+    reference_file = args.reference
+    robex_dir = args.robex
+    split = args.split
 
-    robex_dir = '/mnt/qdata/software/robex'
-    if args.robex:
-        robex_dir = args.robex
-
-    split = 0
-    if args.split:
-        split = args.split
-
-    input_dir = Path(args.input_dir)
-    output_dir = Path(args.output_dir)
-    h5_dir = Path(args.h5_dir)
     file_list = list(input_dir.glob('*.nii.gz'))
-    output_file = 'nako_brain_preprocessed.h5'
 
-    """for file in file_list:
+    for file in file_list:
         out_file_dir = output_dir.joinpath(file.stem.split('.')[0])
         process_brain_t1(file,
                         out_file_dir,
                         reference_file=reference_file,
                         robex_dir=robex_dir,
                         split=split,
-                        verbose=args.verbose)"""
-    convert_nifti_h5(output_dir, h5_dir, output_file)
+                        verbose=args.verbose)
+    convert_nifti_h5(output_dir, h5_dir, key_path, output_file)
 
 
 if __name__ == '__main__':
-    # t1_data = Path('/mnt/data/rawdata/NAKO_195/NAKO_195_MRI_RAW/T1_3D_SAG_MPR_Tra_Defaced/')
-    # ref_file = '/mnt/share/raheppt1/data/brain/NAKO/MNI/MNI152_T1_1mm.nii.gz'
-    # robex_dir = '/home/raheppt1/ROBEX'
-    #
-    # output_dir = Path('/home/raheppt1/tmp')
-    # output_dir.joinpath('raw').mkdir(exist_ok=True)
-    # output_dir.joinpath('n4').mkdir(exist_ok=True)
-    # output_dir.joinpath('n4_flirt').mkdir(exist_ok=True)
-    # output_dir.joinpath('n4_flirt_robex').mkdir(exist_ok=True)
-    # output_dir.joinpath('n4_flirt_robex_fcm').mkdir(exist_ok=True)
-
-    # Copy samples to rawdata directory
-    #i = 0
-    #for f in t1_data.glob('*.nii.gz'):
-    #    print(f)
-    #    shutil.copy(f, output_dir.joinpath('raw', f.name))
-    #    i = i + 1
-    #    if i == 10:
-    #        break
-
     main()

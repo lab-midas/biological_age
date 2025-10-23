@@ -1,8 +1,4 @@
-import os
-from pathlib import Path
-
 import torch
-# import dotenv
 import wandb
 import pandas as pd
 import numpy as np
@@ -13,10 +9,9 @@ from torch.utils.data import DataLoader
 from omegaconf import OmegaConf
 
 from brainage.model.loss import class_loss, l2_loss
-#from brainage.dataset.dataset2d import SliceDataset
 from brainage.model.architecture.resnet2d import generate_model
 
-# TODO upload checkpoints
+
 class AgeModel2DSlices(pl.LightningModule):
 
     def __init__(self,
@@ -41,6 +36,7 @@ class AgeModel2DSlices(pl.LightningModule):
 
         self.learning_rate = cfg.optimizer.learning_rate or 1e-4
         self.weight_decay = cfg.optimizer.weight_decay or 0.0
+
         self.batch_size = cfg.loader.batch_size or 64
         self.num_workers = cfg.loader.num_workers or 4
         
@@ -61,7 +57,7 @@ class AgeModel2DSlices(pl.LightningModule):
 
         # define model
         add_features = 1 if self.use_position else 0
-        assert self.model_name in ['resnet18', 'resnet50']
+
         if self.model_name == 'resnet18':
             net = models.resnet18(pretrained=self.pretrained)
             net.conv1 = torch.nn.Conv2d(self.inputs, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
@@ -70,6 +66,9 @@ class AgeModel2DSlices(pl.LightningModule):
             net = models.resnet50(pretrained=self.pretrained)
             net.conv1 = torch.nn.Conv2d(self.inputs, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
             net.fc = torch.nn.Linear(in_features=2048+add_features, out_features=self.outputs, bias=True)
+        else:
+            raise ValueError('Unknown model, please choose resnet18 or resnet50')
+        
         # split model
         self.features_conv = torch.nn.Sequential(*list(net.children())[:-2])
         self.avgpool = net.avgpool
@@ -87,27 +86,34 @@ class AgeModel2DSlices(pl.LightningModule):
     def forward(self, x, pos=None, hook=False):
         # extract features
         y = self.features_conv(x)
+
         # register the hook
         if hook:
             y.register_hook(self.activations_hook)
+
         # pooling and flatten
         y = self.avgpool(y)
         y = torch.flatten(y, 1)
+
         # if given, include slice position
         if self.use_position: 
             y = torch.cat([y, torch.unsqueeze(pos, dim=1)], dim=1)
+            
         # regression
         y = self.fc(y)
+
         return y
         
     def log_samples(self, batch, batch_idxn, n=5):
         samples = batch['data'].detach().cpu().numpy()
         labels =  batch['label'][0].detach().cpu().numpy()
         slices =  batch['position'].detach().cpu().numpy()
+
         samples = np.transpose(samples, [0,2,3,1])
         samples = [wandb.Image(samples[i]*255, 
                     caption=f'batch {batch_idxn} age {labels[i]} slice {slices[i]}') 
                     for i in range(n)]
+        
         wandb.log({'samples': samples})
 
     def training_step(self, batch, batch_idx):
@@ -118,6 +124,7 @@ class AgeModel2DSlices(pl.LightningModule):
         x = batch['data'].float()
         y = batch['label'][0].float()
         pos = batch['position'].float()
+
         y_hat = self(x, pos=pos)
         loss, y_pred = self.loss_criterion(y_hat, y)
   
@@ -128,10 +135,12 @@ class AgeModel2DSlices(pl.LightningModule):
         x = batch['data'].float()
         y = batch['label'][0].float()
         pos = batch['position'].float()
+
         y_hat = self(x, pos=pos)
         loss, y_pred = self.loss_criterion(y_hat, y)
         mse = F.mse_loss(y_pred, y)
         mae = F.l1_loss(y_pred, y)
+
         self.val_outs.append({'val_loss': loss, 'mse': mse, 'mae': mae})
         return {'val_loss': loss,
                 'mse': mse, 
@@ -141,6 +150,7 @@ class AgeModel2DSlices(pl.LightningModule):
         avg_loss = torch.stack([x['val_loss'] for x in self.val_outs]).mean()
         avg_mae = torch.stack([x['mae'] for x in self.val_outs]).mean()
         avg_mse = torch.stack([x['mse'] for x in self.val_outs]).mean()
+
         logs = {'val_loss': avg_loss, 'mae': avg_mae, 'mse': avg_mse}
         return {'val_loss': avg_loss, 'log': logs}
 
@@ -149,12 +159,22 @@ class AgeModel2DSlices(pl.LightningModule):
 
     def train_dataloader(self):
         dataset = self.train_ds
-        loader = DataLoader(dataset, batch_size=self.batch_size, num_workers=self.num_workers, drop_last=True, shuffle=True, pin_memory=True)
+        loader = DataLoader(dataset, 
+                            batch_size=self.batch_size, 
+                            num_workers=self.num_workers, 
+                            drop_last=True, 
+                            shuffle=True, 
+                            pin_memory=True)
         return loader
     
     def val_dataloader(self):
         dataset = self.val_ds
-        loader = DataLoader(dataset, batch_size=self.batch_size, num_workers=self.num_workers, drop_last=True, shuffle=False, pin_memory=True)
+        loader = DataLoader(dataset, 
+                            batch_size=self.batch_size, 
+                            num_workers=self.num_workers, 
+                            drop_last=True, 
+                            shuffle=False, 
+                            pin_memory=True)
         return loader
 
 
@@ -212,22 +232,29 @@ class AgeModel2DChannels(pl.LightningModule):
         # compute gradients
         y = self(x, pos=pos, hook=True)
         y[0, channel].backward()
+
         gradients = self.net.get_activations_gradient()
         pooled_gradients = torch.mean(gradients, dim=[0, 2, 3])
         activations = self.net.get_activations(x).detach()
+
         # weight the channels by corresponding gradients
         for i in range(activations.size()[1]):
             activations[:, i, :, :] *= pooled_gradients[i]
+
         heatmap = torch.mean(activations, dim=1).squeeze()
         return y, heatmap
 
     def log_samples(self, batch, batch_idx):
         samples = []
+
         for img, label in zip(batch['data'], batch['label']):
+
             if img.ndim == 4:
                 img = img[0, ...]
+
             imgc = np.transpose(img.cpu().numpy(), (1, 2, 0)) # * 255.0
             samples.append(wandb.Image(imgc, caption=f'batch {batch_idx} age {label}'))
+
         if not self.offline_wandb:
             self.logger.experiment.log({'samples': samples})
 
@@ -235,6 +262,7 @@ class AgeModel2DChannels(pl.LightningModule):
         x = batch['data'].float()
         y = batch['label'].float()
         pos = batch['position'].float() if self.use_position else None
+
         y_hat = self(x, pos=pos)
         loss, y_pred = self.loss_criterion(y_hat, y)
 
@@ -249,10 +277,13 @@ class AgeModel2DChannels(pl.LightningModule):
         x = batch['data'].float()
         y = batch['label'].float()
         pos = batch['position'].float() if self.use_position else None
+
         y_hat = self(x, pos=pos)
         loss, y_pred = self.loss_criterion(y_hat, y)
+
         mse = F.mse_loss(y_pred, y)
         mae = F.l1_loss(y_pred, y)
+
         self.log("validation/loss", loss)
         self.log('mse', mse)
         self.log('mae', mae)
@@ -272,10 +303,12 @@ class AgeModel2DChannels(pl.LightningModule):
         x = batch['data'].float()
         y = batch['label'].float()
         pos = batch['position'].float() if self.use_position else None
+
         y_hat = self(x, pos=pos).detach().cpu().numpy()
         pred = [y_hat[i, 0] for i in range(y_hat.shape[0])]
         sigma = [y_hat[i, 1] for i in range(y_hat.shape[0])]
         pos = [pos[i].detach().cpu().numpy() for i in range(len(pos))] if self.use_position else [None] * len(x)
+        
         self.result_df['key'].extend(batch['key'])
         self.result_df['age'].extend(y.detach().cpu().numpy())
         self.result_df['pred'].extend(pred)
@@ -295,16 +328,29 @@ class AgeModel2DChannels(pl.LightningModule):
 
     def train_dataloader(self):
         dataset = self.train_ds
-        loader = DataLoader(dataset, batch_size=self.batch_size, num_workers=self.num_workers, drop_last=True,
-                            shuffle=True, pin_memory=True)
+        loader = DataLoader(dataset, 
+                            batch_size=self.batch_size, 
+                            num_workers=self.num_workers, 
+                            drop_last=True,
+                            shuffle=True, 
+                            pin_memory=True)
         return loader
 
     def val_dataloader(self):
         dataset = self.val_ds
-        loader = DataLoader(dataset, batch_size=self.batch_size, num_workers=self.num_workers, drop_last=True,
-                            shuffle=False, pin_memory=True)
+        loader = DataLoader(dataset, 
+                            batch_size=self.batch_size, 
+                            num_workers=self.num_workers, 
+                            drop_last=True,
+                            shuffle=False, 
+                            pin_memory=True)
         return loader
 
     def dataloader(self, dataset):
-        loader = DataLoader(dataset, batch_size=1, num_workers=self.num_workers, drop_last=False, shuffle=False, pin_memory=True)
+        loader = DataLoader(dataset, 
+                            batch_size=1, 
+                            num_workers=self.num_workers, 
+                            drop_last=False, 
+                            shuffle=False, 
+                            pin_memory=True)
         return loader

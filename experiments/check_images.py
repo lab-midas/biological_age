@@ -110,7 +110,7 @@ if __name__ == '__main__':
             #data = '/mnt/qdata/share/raecker1/ukbdata_70k/interim/ukb_pnc_preprocessed_masked.h5'
             data = '/mnt/qdata/share/raecker1/ukbdata_70k/interim/ukb_pnc_preprocessed_masked'
             load_abdominal_data(data, key, organ='pancreas', contrast='wat', group='', ukb=True)
-        elif organ == 'kidneys':
+        elif organ == 'kidney':
             """data = '/mnt/qdata/share/raecker1/ukbdata_70k/interim/ukb_kidney_preprocessed_masked.h5'
             load_abdominal_data(data, f'{key}/left', organ='kidney', contrast='wat', group='', ukb=True)
             load_abdominal_data(data, f'{key}/right', organ='kidney', contrast='wat', group='', ukb=True)"""

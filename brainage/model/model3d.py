@@ -1,19 +1,12 @@
-import logging
-from pathlib import Path
-
 import wandb
 import torch
-import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import pytorch_lightning as pl
-#from omegaconf import OmegaConf
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 
 from brainage.model.loss import l2_loss
 from brainage.model.architecture.resnet3d import generate_model
-#from brainage.model.architecture.simple import SimpleCNN
 
 
 class AgeModel3DVolume(pl.LightningModule):
@@ -29,7 +22,6 @@ class AgeModel3DVolume(pl.LightningModule):
         super().__init__()
 
         # copy over
-        #self.hparams = hparams
         self.model_depth = cfg['model']['depth'] or 18
         self.inputs = cfg['model']['inputs'] or 3
         self.outputs = cfg['model']['outputs'] or 1
@@ -71,25 +63,32 @@ class AgeModel3DVolume(pl.LightningModule):
         # compute gradients
         y = self(x, pos=pos, hook=True)
         y[0, channel].backward()
+
         gradients = self.net.get_activations_gradient()
         pooled_gradients = torch.mean(gradients, dim=[0, 2, 3])
         activations = self.net.get_activations(x).detach()
+
         # weight the channels by corresponding gradients
         for i in range(activations.size()[1]):
             activations[:, i, :, :] *= pooled_gradients[i]
+
         heatmap = torch.mean(activations, dim=1).squeeze()
         return y, heatmap
 
     def log_samples(self, batch, batch_idx):
         samples = []
+
         for img, label in zip(batch['data'], batch['label']):
+
             if self.dataset == 'brain':
                 imgc = img[0, :, img.size()[2]//2, :].cpu().numpy() * 255.0
             elif self.dataset == 'abdominal':
                 imgc = img[0, :, :, int(img.size()[3] // 2)].cpu().numpy()
             else:
                 imgc = img[0, :, :, int(img.size()[3] // 2)].cpu().numpy() * 255.0
+
             samples.append(wandb.Image(imgc, caption=f'batch {batch_idx} age {label}'))
+
         if not self.offline_wandb:
             self.logger.experiment.log({'samples': samples})
 
@@ -97,6 +96,7 @@ class AgeModel3DVolume(pl.LightningModule):
         x = batch['data'].float()
         y = batch['label'].float()
         pos = batch['position'].float() if self.use_position else None
+
         y_hat = self(x, pos=pos)
         loss, y_pred = self.loss_criterion(y_hat, y)
 
@@ -111,6 +111,7 @@ class AgeModel3DVolume(pl.LightningModule):
         x = batch['data'].float()
         y = batch['label'].float()
         pos = batch['position'].float() if self.use_position else None
+        
         y_hat = self(x, pos=pos)
         loss, y_pred = self.loss_criterion(y_hat, y)
         mse = F.mse_loss(y_pred, y)
@@ -157,14 +158,29 @@ class AgeModel3DVolume(pl.LightningModule):
 
     def train_dataloader(self):
         dataset = self.train_ds
-        loader = DataLoader(dataset, batch_size=self.batch_size, num_workers=self.num_workers, drop_last=True, shuffle=True, pin_memory=True)
+        loader = DataLoader(dataset, 
+                            batch_size=self.batch_size, 
+                            num_workers=self.num_workers, 
+                            drop_last=True, 
+                            shuffle=True, 
+                            pin_memory=True)
         return loader
     
     def val_dataloader(self):
         dataset = self.val_ds
-        loader = DataLoader(dataset, batch_size=self.batch_size, num_workers=self.num_workers, drop_last=True, shuffle=False, pin_memory=True)
+        loader = DataLoader(dataset, 
+                            batch_size=self.batch_size, 
+                            num_workers=self.num_workers, 
+                            drop_last=True, 
+                            shuffle=False, 
+                            pin_memory=True)
         return loader
 
     def dataloader(self, dataset):
-        loader = DataLoader(dataset, batch_size=1, num_workers=self.num_workers, drop_last=False, shuffle=False, pin_memory=True)
+        loader = DataLoader(dataset, 
+                            batch_size=1, 
+                            num_workers=self.num_workers, 
+                            drop_last=False, 
+                            shuffle=False, 
+                            pin_memory=True)
         return loader

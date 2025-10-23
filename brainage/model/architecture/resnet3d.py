@@ -1,9 +1,9 @@
-import math
 from functools import partial
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 # resnet reference: https://github.com/kenshohara/3D-ResNets-PyTorch/blob/master/models/resnet.py
+
 
 class PixelNorm3d(nn.Module):
     # noinspection PyUnusedLocal
@@ -233,6 +233,7 @@ class ResNet(nn.Module):
         out = F.avg_pool3d(x, kernel_size=1, stride=stride)
         zero_pads = torch.zeros(out.size(0), planes - out.size(1), out.size(2),
                                 out.size(3), out.size(4))
+        
         if isinstance(out.data, torch.cuda.FloatTensor):
             zero_pads = zero_pads.cuda()
 
@@ -242,6 +243,7 @@ class ResNet(nn.Module):
 
     def _make_layer(self, block, planes, blocks, shortcut_type, stride=1):
         downsample = None
+
         if stride != 1 or self.in_planes != planes * block.expansion:
             if shortcut_type == 'A':
                 downsample = partial(self._downsample_basic_block,
@@ -253,6 +255,7 @@ class ResNet(nn.Module):
                     VarNorm3d(planes * block.expansion, self.norm_type))
 
         layers = []
+
         layers.append(
             block(in_planes=self.in_planes,
                   planes=planes,
@@ -260,6 +263,7 @@ class ResNet(nn.Module):
                   downsample=downsample,
                   norm_type=self.norm_type))
         self.in_planes = planes * block.expansion
+
         for i in range(1, blocks):
             layers.append(block(self.in_planes, planes, self.norm_type))
 
@@ -270,6 +274,7 @@ class ResNet(nn.Module):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
+
         if not self.no_max_pool:
             x = self.maxpool(x)
         if self.use_layer == 1:
@@ -280,15 +285,19 @@ class ResNet(nn.Module):
             x = self.layer3(x)
         if self.use_layer == 4:
             x = self.layer4(x)
+
         # register the hook
         if hook:
             x.register_hook(self.activations_hook)
+
         # pooling and flatten
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
+
         # if given, include slice position
         if self.use_position: 
-            x = torch.cat([x, torch.unsqueeze(pos, 1)], dim=1)  # old code: pos.flatten(start_dim=1)
+            x = torch.cat([x, torch.unsqueeze(pos, 1)], dim=1)
+
         # fully connected part
         x = self.fc(x)
         return x
@@ -306,6 +315,7 @@ class ResNet(nn.Module):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
+
         if not self.no_max_pool:
             x = self.maxpool(x)
 
@@ -337,5 +347,7 @@ def generate_model(model_depth, **kwargs):
         model = ResNet(Bottleneck, [3, 8, 36, 3], get_inplanes(), **kwargs)
     elif model_depth == 200:
         model = ResNet(Bottleneck, [3, 24, 36, 3], get_inplanes(), **kwargs)
+    else:
+        raise ValueError(f"Invalid model depth: {model_depth}, only 10, 18, 34, 50, 101, 152, and 200 are supported.")
 
     return model

@@ -28,3 +28,4 @@ cd /home/raecker1/nako_ukb_age/preprocess
 #/opt/conda/rakuest1/envs/nakoukb/bin/python3 convert2nnunet.py --nifti_folder /mnt/qdata/share/rakuest1/data/UKB/tmp/abdominal_MRI/nifti --nnunet_folder /mnt/qdata/share/rakuest1/data/UKB/tmp/abdominal_MRI/nnunet --dataset_name ukbb --num_channels 4
 #/opt/conda/rakuest1/envs/nakoukb/bin/python3 predict.py --nnunet_folder /mnt/qdata/share/rakuest1/data/UKB/tmp/abdominal_MRI/nnunet --prediction_folder /mnt/qdata/share/rakuest1/data/UKB/tmp/abdominal_MRI/seg --dataset_name ukbb --num_channels 4
 #/opt/conda/rakuest1/envs/nakoukb/bin/python3 convert2original.py --prediction_folder /mnt/qdata/share/rakuest1/data/UKB/tmp/abdominal_MRI/seg --output_folder /mnt/qdata/share/rakuest1/data/UKB/tmp/abdominal_MRI/seg_ori
+/opt/conda/raecker1/envs/nakoukb/bin/python3 get_age_from_dicom.py

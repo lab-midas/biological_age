@@ -34,7 +34,7 @@ from collections import OrderedDict
 import csv
 import dateutil.parser
 import pandas as pd
-from biobank_utils import *
+from preprocess.utils.biobank_utils import *
 
 
 def unzip(zip_file, output_dir):

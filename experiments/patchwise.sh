@@ -12,8 +12,8 @@ echo "$(pyenv which python)"
 export CONFIG=$PRJ/brainage/config/patchwise/config.yaml
 export CUDA_VISIBLE_DEVICES=1
 cd $PRJ/brainage
-python $PRJ/brainage/brainage/trainer/train3d.py dataset=hr dataset.fold=0
-python $PRJ/brainage/brainage/trainer/train3d.py dataset=hr dataset.fold=1
-python $PRJ/brainage/brainage/trainer/train3d.py dataset=hr dataset.fold=2
-python $PRJ/brainage/brainage/trainer/train3d.py dataset=hr dataset.fold=3
-python $PRJ/brainage/brainage/trainer/train3d.py dataset=hr dataset.fold=4
+python $PRJ/brainage/brainage/trainer/train.py dataset=hr dataset.fold=0
+python $PRJ/brainage/brainage/trainer/train.py dataset=hr dataset.fold=1
+python $PRJ/brainage/brainage/trainer/train.py dataset=hr dataset.fold=2
+python $PRJ/brainage/brainage/trainer/train.py dataset=hr dataset.fold=3
+python $PRJ/brainage/brainage/trainer/train.py dataset=hr dataset.fold=4

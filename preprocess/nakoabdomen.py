@@ -661,27 +661,27 @@ def combine_kidney_h5(input_dir, output_dir, output_file, save_path, verbose=Fal
 
     # grp_image = hdf5file.create_group('image')
 
-    """keys_kidney_train = [l.strip() for l in Path(output_dir).joinpath('keys', 'train_kidneys_mainly_healthy.dat').open().readlines()]
+    """keys_kidney_train = [l.strip() for l in Path(output_dir).joinpath('keys', 'train_kidney_mainly_healthy.dat').open().readlines()]
     keys_kidney_train = [k + '/left' for k in keys_kidney_train] + [k + '/right' for k in keys_kidney_train]
-    with open(output_dir.joinpath('keys', 'train_kidneys_mainly_healthy_combined.dat'), 'w') as f:
+    with open(output_dir.joinpath('keys', 'train_kidney_mainly_healthy_combined.dat'), 'w') as f:
         for key in keys_kidney_train:
             f.write(key + '\n')
 
-    keys_kidney_test = [l.strip() for l in Path(output_dir).joinpath('keys', 'test_kidneys_mainly_healthy.dat').open().readlines()]
+    keys_kidney_test = [l.strip() for l in Path(output_dir).joinpath('keys', 'test_kidney_mainly_healthy.dat').open().readlines()]
     keys_kidney_test = [k + '/left' for k in keys_kidney_test] + [k + '/right' for k in keys_kidney_test]
-    with open(output_dir.joinpath('keys', 'test_kidneys_mainly_healthy_combined.dat'), 'w') as f:
+    with open(output_dir.joinpath('keys', 'test_kidney_mainly_healthy_combined.dat'), 'w') as f:
         for key in keys_kidney_test:
             f.write(key + '\n')
 
-    keys_kidney_train = [l.strip() for l in Path(output_dir).joinpath('keys', 'full_test_kidneys_mainly_healthy.dat').open().readlines()]
+    keys_kidney_train = [l.strip() for l in Path(output_dir).joinpath('keys', 'full_test_kidney_mainly_healthy.dat').open().readlines()]
     keys_kidney_train = [k + '/left' for k in keys_kidney_train] + [k + '/right' for k in keys_kidney_train]
-    with open(output_dir.joinpath('keys', 'full_test_kidneys_mainly_healthy_combined.dat'), 'w') as f:
+    with open(output_dir.joinpath('keys', 'full_test_kidney_mainly_healthy_combined.dat'), 'w') as f:
         for key in keys_kidney_train:
                 f.write(key + '\n')"""
     
-    keys_kidney_gradcam = [l.strip() for l in Path(output_dir).joinpath('keys', 'gradcam_kidneys_mainly_healthy.dat').open().readlines()]
+    keys_kidney_gradcam = [l.strip() for l in Path(output_dir).joinpath('keys', 'gradcam_kidney_mainly_healthy.dat').open().readlines()]
     keys_kidney_gradcam = [k + '/left' for k in keys_kidney_gradcam] + [k + '/right' for k in keys_kidney_gradcam]
-    with open(output_dir.joinpath('keys', 'gradcam_kidneys_mainly_healthy_combined.dat'), 'w') as f:
+    with open(output_dir.joinpath('keys', 'gradcam_kidney_mainly_healthy_combined.dat'), 'w') as f:
         for key in keys_kidney_gradcam:
                 f.write(key + '\n')
 

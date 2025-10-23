@@ -20,9 +20,9 @@ export CONFIG=$PRJ/config/volume/config_ukb_liver.yaml
 cd $PRJ
 export PYTHONPATH=$PRJ
 # MIDASGPUWorker env: optox, denbi: nakoukb
-/opt/conda/raecker1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train3d.py --config $CONFIG
-#/opt/conda/rakuest1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train3d.py dataset.fold=0
-#/opt/conda/rakuest1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train3d.py dataset.fold=1
-#/opt/conda/rakuest1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train3d.py dataset.fold=2
-#/opt/conda/rakuest1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train3d.py dataset.fold=3
-#/opt/conda/rakuest1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train3d.py dataset.fold=4
+/opt/conda/raecker1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train.py --config $CONFIG
+#/opt/conda/rakuest1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train.py dataset.fold=0
+#/opt/conda/rakuest1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train.py dataset.fold=1
+#/opt/conda/rakuest1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train.py dataset.fold=2
+#/opt/conda/rakuest1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train.py dataset.fold=3
+#/opt/conda/rakuest1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train.py dataset.fold=4

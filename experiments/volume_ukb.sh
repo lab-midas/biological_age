@@ -17,8 +17,8 @@ export CONFIG=$PRJ/config/volume/config_ukb.yaml
 cd $PRJ
 export PYTHONPATH=$PRJ
 # MIDASGPUWorker env: optox, denbi: nakoukb
-/opt/conda/rakuest1/envs/optox/bin/python $PRJ/brainage/trainer/train3d.py dataset.fold=0
-/opt/conda/rakuest1/envs/optox/bin/python $PRJ/brainage/trainer/train3d.py dataset.fold=1
-/opt/conda/rakuest1/envs/optox/bin/python $PRJ/brainage/trainer/train3d.py dataset.fold=2
-/opt/conda/rakuest1/envs/optox/bin/python $PRJ/brainage/trainer/train3d.py dataset.fold=3
-/opt/conda/rakuest1/envs/optox/bin/python $PRJ/brainage/trainer/train3d.py dataset.fold=4
+/opt/conda/rakuest1/envs/optox/bin/python $PRJ/brainage/trainer/train.py dataset.fold=0
+/opt/conda/rakuest1/envs/optox/bin/python $PRJ/brainage/trainer/train.py dataset.fold=1
+/opt/conda/rakuest1/envs/optox/bin/python $PRJ/brainage/trainer/train.py dataset.fold=2
+/opt/conda/rakuest1/envs/optox/bin/python $PRJ/brainage/trainer/train.py dataset.fold=3
+/opt/conda/rakuest1/envs/optox/bin/python $PRJ/brainage/trainer/train.py dataset.fold=4

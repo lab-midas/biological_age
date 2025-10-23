@@ -16,15 +16,15 @@ export PATH=/opt/conda/raecker1/envs/nakoukb/bin:/opt/miniconda3/condabin:$PATH
 
 
 #SINGULARITYENV_PYTHONPATH=/home/raecker1/nako_ukb_age singularity exec --bind /mnt --nv /home/raecker1/age.sif \
-#            python3 $PRJ/brainage/trainer/train3d.py --config  /home/raecker1/nako_ukb_age/config/volume/config_ukb_brain.yaml
+#            python3 $PRJ/brainage/trainer/train.py --config  /home/raecker1/nako_ukb_age/config/volume/config_ukb_brain.yaml
 module load cuda/11.3
 export CONFIG=$PRJ/config/volume/config_ukb_brain.yaml
 cd $PRJ
 export PYTHONPATH=$PRJ
 # MIDASGPUWorker env: optox, denbi: nakoukb
-/opt/conda/raecker1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train3d.py --config $CONFIG
-#/opt/conda/rakuest1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train3d.py dataset.fold=0
-#/opt/conda/rakuest1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train3d.py dataset.fold=1
-#/opt/conda/rakuest1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train3d.py dataset.fold=2
-#/opt/conda/rakuest1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train3d.py dataset.fold=3
-#/opt/conda/rakuest1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train3d.py dataset.fold=4
+/opt/conda/raecker1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train.py --config $CONFIG
+#/opt/conda/rakuest1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train.py dataset.fold=0
+#/opt/conda/rakuest1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train.py dataset.fold=1
+#/opt/conda/rakuest1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train.py dataset.fold=2
+#/opt/conda/rakuest1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train.py dataset.fold=3
+#/opt/conda/rakuest1/envs/nakoukb/bin/python $PRJ/brainage/trainer/train.py dataset.fold=4

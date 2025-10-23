@@ -1,7 +1,20 @@
 wandb/
-ukb_age_*/
 age/
 config/
+experiments/
+log/
+notebooks/
+utils_private/
+
+data/
+outputs/
+
+preprocess/stitching/
+results/
+lightning_logs/
+
+dicom_patient_data.csv
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -91,26 +104,4 @@ target/
 
 # Mypy cache
 .mypy_cache/
-logs/
-data/
-outputs/
 
-preprocess/stitching/
-results/
-experiments/job*
-preprocess/job*
-lightning_logs/
-
-dummy.png
-dummy_new.png
-preprocess/dummy_masked_organ_liv.png
-preprocess/dummy_masked_organ_lkd.png
-preprocess/dummy_masked_organ_pnc.png
-preprocess/dummy_masked_organ_rkd.png
-preprocess/dummy_masked_organ_spl.png
-preprocess/dummy.py
-dicom_patient_data.csv
-preprocess/test*
-preprocess/test.py
-preprocess/test.ipynb
-test*
